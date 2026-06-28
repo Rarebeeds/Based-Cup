@@ -143,6 +143,12 @@
     cursor:pointer;transition:border-color .15s,transform .1s}
   .charCard:hover{transform:translateY(-2px)}
   .charCard.sel{border-color:#51cf66;box-shadow:0 0 0 2px rgba(81,207,102,.3)}
+  #charCarousel{display:flex;align-items:center;gap:10px;justify-content:center;margin:4px 0}
+  .caroArrow{background:#11203a;border:1px solid #2f5a8a;color:#dce8ff;font-size:30px;font-weight:bold;
+    width:46px;height:120px;border-radius:12px;cursor:pointer;flex:none;line-height:1}
+  .caroArrow:hover{background:#1a2e52} .caroArrow:active{transform:scale(.95)}
+  #charStage{flex:1;max-width:300px;transition:border-color .15s,box-shadow .15s}
+  .charBigImg{width:118px;height:118px;object-fit:contain;display:block;margin:2px auto 8px}
   .charCard[data-char="trumpe"].sel{border-color:#ff8787;box-shadow:0 0 0 2px rgba(255,135,135,.3)}
   .charImg{width:84px;height:84px;object-fit:contain;display:block;margin:0 auto 4px}
   .charName{font-weight:bold;letter-spacing:1px;font-size:16px;margin-bottom:8px}
@@ -185,6 +191,15 @@
   .bub{max-width:78%;padding:7px 11px;border-radius:13px;font-size:14px;line-height:1.3;word-wrap:break-word}
   .bub.me{align-self:flex-end;background:#2b6c45;color:#eafff0;border-bottom-right-radius:4px}
   .bub.them{align-self:flex-start;background:#1b2740;color:#e8eefc;border-bottom-left-radius:4px}
+  .bub-meta{display:block;font-size:9px;opacity:.55;margin-top:3px;text-align:right;letter-spacing:.3px}
+  .bub.them .bub-meta{text-align:left}
+  .bub .bstat.seen{color:#9bf6a8;opacity:1}
+  .chatStatus{font-size:11px;color:#7fb893;line-height:1.2}
+  .typingInd{font-size:12px;color:#9bf6a8;font-style:italic;padding:0 6px 6px;display:flex;align-items:center;gap:6px}
+  .tdots{display:inline-flex;gap:3px}
+  .tdots i{width:5px;height:5px;border-radius:50%;background:#69db7c;display:block;animation:tbounce 1s infinite}
+  .tdots i:nth-child(2){animation-delay:.15s}.tdots i:nth-child(3){animation-delay:.3s}
+  @keyframes tbounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-4px);opacity:1}}
   /* animated game title */
   .gameTitle{font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:42px;letter-spacing:5px;  background:linear-gradient(90deg,#69db7c,#ffd43b,#ff8787,#69db7c);background-size:300% 100%;
     -webkit-background-clip:text;background-clip:text;color:transparent;text-align:center;
@@ -351,7 +366,7 @@
     background:linear-gradient(180deg,rgba(9,24,15,.96),rgba(5,15,9,.96));
     border:2px solid #69db7c;border-radius:16px;padding:16px 22px;
     box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 26px rgba(105,219,124,.25);
-    animation:bannerIn .35s ease-out}
+    animation:bannerIn .22s ease-out}
   #mbMode{font-size:22px;font-weight:900;letter-spacing:1px;color:#e9fff0}
   #mbVs{font-size:15px;color:#9bf6a8;margin-top:4px}
   #mbWager{font-size:15px;font-weight:800;color:#ffd43b;margin-top:6px}
@@ -372,8 +387,8 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b31 ✓</div>
-  <div id="potTag" class="hide" style="position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.35);padding:3px 10px;border-radius:8px"></div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b34 ✓</div>
+  <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
   <!-- DAILY TASKS dock (left side, menu only) -->
@@ -394,7 +409,7 @@
     <div class="spRow" data-region="sin"><span class="spName">🇸🇬 Singapore</span><span class="spMeta">ping&nbsp;—<br>—&nbsp;playing</span></div>
     <div class="row" style="margin-top:6px"><button class="btn ghost" id="serverPopupClose" style="width:100%;padding:7px">CLOSE</button></div>
   </div>
-  <div id="pingTag" class="hide" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:11px;color:rgba(180,255,200,.7);z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.3);padding:2px 8px;border-radius:8px"></div>
+  <div id="pingTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(4%);font-size:11px;color:rgba(180,255,200,.85);z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 9px;border-radius:8px"></div>
 
   <div id="hud" class="hide">
     <div class="team tP" id="pTeam">PEP</div>
@@ -689,22 +704,18 @@
   <div class="overlay hide" id="selectScreen">
     <div class="card wide">
       <div class="formTitle" id="selTitle">CHOOSE YOUR CHARACTER</div>
-      <div class="charRow">
-        <div class="charCard sel" data-char="pepe" id="ccPepe">
-          <img class="charImg" id="imgPepe" alt="Pepe">
-          <div class="charName" style="color:#69db7c">PEPE</div>
-          <div class="statB"><span>SPEED</span><div class="sbar"><i style="width:90%"></i></div></div>
-          <div class="statB"><span>POWER</span><div class="sbar"><i style="width:50%"></i></div></div>
-          <div class="statB"><span>STAMINA</span><div class="sbar"><i style="width:60%"></i></div></div>
+      <div id="charCarousel">
+        <button class="caroArrow" id="charPrev" aria-label="previous">‹</button>
+        <div id="charStage" class="charCard sel" data-char="pepe">
+          <img class="charBigImg" id="charBigImg" alt="">
+          <div class="charName" id="charBigName" style="color:#69db7c">PEPE</div>
+          <div class="statB"><span>SPEED</span><div class="sbar"><i id="csSpeed" style="width:90%"></i></div></div>
+          <div class="statB"><span>POWER</span><div class="sbar"><i id="csPower" style="width:50%"></i></div></div>
+          <div class="statB"><span>STAMINA</span><div class="sbar"><i id="csStam" style="width:60%"></i></div></div>
         </div>
-        <div class="charCard" data-char="trumpe" id="ccTrumpe">
-          <img class="charImg" id="imgTrumpe" alt="Trumpe">
-          <div class="charName" style="color:#ff8787">TRUMPE</div>
-          <div class="statB"><span>SPEED</span><div class="sbar"><i style="width:60%"></i></div></div>
-          <div class="statB"><span>POWER</span><div class="sbar"><i style="width:90%"></i></div></div>
-          <div class="statB"><span>STAMINA</span><div class="sbar"><i style="width:80%"></i></div></div>
-        </div>
+        <button class="caroArrow" id="charNext" aria-label="next">›</button>
       </div>
+      <div class="muted" id="charHint" style="margin:0 0 6px">‹ tap the arrows to pick your character ›</div>
 
       <div id="modeRow">
         <div class="orline"><span>game mode</span></div>
@@ -715,16 +726,6 @@
         <div class="muted" id="modeHint" style="margin:0 0 4px">First to most goals in 60s.</div>
       </div>
 
-      <div id="stakeRow" style="display:none">
-        <div class="orline"><span><span class="bcoin"></span> wager</span></div>
-        <div class="row"><div class="seg" id="stakeSeg">
-          <button data-stake="0" class="on">FRIENDLY</button>
-          <button data-stake="50">50</button>
-          <button data-stake="100">100</button>
-          <button data-stake="250">250</button>
-        </div></div>
-        <div class="muted" id="stakeHint" style="margin:0 0 4px">Stake $BASED — winner takes the pot.</div>
-      </div>
 
       <div id="oppOptions">
         <div class="orline"><span>opponent</span></div>
@@ -770,8 +771,12 @@
   <div class="overlay hide" id="chatScreen">
     <div class="card">
       <div class="chatHead"><button class="linkBtn" id="chatBackBtn">‹ back</button>
-        <span class="chatWith" id="chatWith">friend</span><span id="chatDot" class="cdot"></span></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px"><span class="chatWith" id="chatWith">friend</span><span id="chatDot" class="cdot"></span></div>
+          <div class="chatStatus" id="chatStatus">—</div>
+        </div></div>
       <div class="chatLog" id="chatLog"></div>
+      <div class="typingInd hide" id="typingInd"><span class="tdots"><i></i><i></i><i></i></span> <span id="typingName">friend</span> is typing</div>
       <div class="addRow">
         <input id="chatInput" class="inp" maxlength="500" placeholder="Message…" autocomplete="off">
         <button class="btn" id="chatSendBtn">SEND</button>
@@ -882,6 +887,7 @@ imgP.src=PEPE_SRC; imgT.src=TRUMPE_SRC;
 // ---- Game state ----
 let state='menu', mode='ai', diff='normal';
 let humanChar='pepe', oppActive=true;
+let oppChar=null;   // opponent's character; null = use the opposite of humanChar (practice/local). online sets it so both can be the same.
 let score={p:0,t:0};
 let players, ball, kickFlash, lastTime, toastT=0, goalLock=0;
 let gameMode='goals', possP=0, possT=0;   // keepaway mode: hold the ball longest
@@ -893,7 +899,7 @@ function mkPlayer(x,y,who,char){ const d=statDerived(char);
     kickCD:0,boost:0, aim: who==='p'?0:Math.PI, stamina:1, sprinting:false, charge:0, charging:false,
     maxBase:d.maxBase, kickPow:d.kickPow, stamDrain:d.stamDrain, stamRegen:d.stamRegen}; }
 function reset(concededBy){
-  const oc = humanChar==='pepe'?'trumpe':'pepe';
+  const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
   players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };
   ball={x:W/2,y:H/2,vx:0,vy:0, owner:null, kickLock:18};
   if(concededBy==='t'){ ball.x=W*0.64; ball.vx=1.2; }
@@ -932,8 +938,11 @@ function updateHUD(){
   if(players){ setStam('pStam',players.p); setStam('tStam',players.t); }
   const pt=document.getElementById('pingTag');
   if(pt){ if(netRole && NET.rtt!=null){ pt.classList.remove('hide');
-      const q = NET.rtt<60?'🟢':NET.rtt<120?'🟡':'🔴';
-      pt.textContent = q+' ping '+NET.rtt+'ms'; }
+      const r = NET.rttShown!=null?NET.rttShown:NET.rtt;
+      const q = r<60?'🟢':r<120?'🟡':'🔴';
+      pt.textContent = q+' ping '+r+'ms';
+      // paired with the pot pill; centre the lone ping pill when there's no wager
+      pt.style.transform = document.getElementById('potTag').classList.contains('hide') ? 'translateX(-50%)' : 'translateX(4%)'; }
     else pt.classList.add('hide'); }
 }
 
@@ -1189,7 +1198,8 @@ function applyMove(pl,ax,ay,sprint){
   const moving=Math.hypot(ax,ay)>0.1;
   pl.sprinting = !!sprint && pl.stamina>0.02 && moving;
   pl.stamina = clamp(pl.stamina + (pl.sprinting?-pl.stamDrain:pl.stamRegen), 0, 1);
-  const ACC=pl.sprinting?1.25:1.0, MAX=pl.maxBase*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  const ACC=pl.sprinting?1.25:1.0; let MAX=pl.maxBase*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  if(gameMode==='keepaway' && ball.owner===pl.who) MAX*=0.75;   // ball-holder is 25% slower in keep-away
   pl.vx+=ax*ACC; pl.vy+=ay*ACC;
   const sp=Math.hypot(pl.vx,pl.vy);
   if(sp>MAX){pl.vx=pl.vx/sp*MAX; pl.vy=pl.vy/sp*MAX;}
@@ -1216,6 +1226,7 @@ function tryKick(pl, chargeAmt){
   ball.vx=Math.cos(a)*power;            // set absolutely — independent of player velocity
   ball.vy=Math.sin(a)*power;
   ball.owner=null; ball.kickLock=16; ball.kicker=pl.who;
+  ball.shooter=pl.who; ball.wallBounce=false; ball.oppTouch=false; ball.kickX=pl.x; ball.kickY=pl.y;   // keep-away rebound tracking
   pl.kickCD=14; kickFlash=6;            // no movement boost from kicking
   sfxKick(); sfxGrunt(pl.char);
 }
@@ -1226,20 +1237,29 @@ function aiControl(pl){
   const D={easy:{spd:.72,err:48,kick:.5},
            normal:{spd:.9,err:26,kick:.75},
            hard:{spd:1.0,err:10,kick:.95}}[diff];
+  const ka=(gameMode==='keepaway');
   let tx,ty;
-  if(ball.owner==='t'){                 // dribble toward the left goal
-    tx=FIELD.l+24; ty=clamp(ball.y+(H/2-ball.y)*0.25, GY0+14, GY1-14);
+  if(ball.owner==='t'){
+    if(ka){                             // keep-away: flee to open space, away from the human, never toward a goal
+      tx = players.p.x < W/2 ? W*0.72 : W*0.28;
+      ty = clamp(pl.y + (pl.y<H/2?70:-70), GY0+30, GY1-30);
+    }else{                              // goals: dribble toward the left goal
+      tx=FIELD.l+24; ty=clamp(ball.y+(H/2-ball.y)*0.25, GY0+14, GY1-14);
+    }
   }else{                                // chase the ball anywhere on the field
     tx=ball.x+PLAYER_R*0.5; ty=ball.y;
   }
   tx+=(Math.random()-.5)*D.err; ty+=(Math.random()-.5)*D.err;
   let ax=tx-pl.x, ay=ty-pl.y; const m=Math.hypot(ax,ay)||1; ax/=m; ay/=m;
   const dd=Math.hypot(ball.x-pl.x, ball.y-pl.y);
+  const hd=Math.hypot(players.p.x-pl.x, players.p.y-pl.y);
   const sprint = pl.stamina>0.25 && (dd>175 || ball.owner==='t');
   applyMoveAI(pl,ax*D.spd, ay*D.spd, sprint);
   if(kickoffLock>0) kickoffLock--;
   if(ball.owner==='t'){
-    if(kickoffLock===0 && pl.x<W*0.46 && Math.random()<D.kick) tryKick(pl,0.85);     // shoot
+    if(ka){                             // only poke it away under real pressure, aimed at centre (never a goal mouth)
+      if(kickoffLock===0 && hd<PLAYER_R*2.4 && Math.random()<D.kick*0.4){ pl.aim=Math.atan2(H/2-pl.y, W/2-pl.x); tryKick(pl,0.45); }
+    }else if(kickoffLock===0 && pl.x<W*0.46 && Math.random()<D.kick) tryKick(pl,0.85);     // shoot
   }else if(kickoffLock===0 && dd<PLAYER_R+BALL_R+16 && Math.random()<D.kick*0.85){
     tryKick(pl,0.7);                                             // win it / clear toward goal
   }
@@ -1248,7 +1268,8 @@ function applyMoveAI(pl,ax,ay,sprint){
   const moving=Math.hypot(ax,ay)>0.1;
   pl.sprinting = !!sprint && pl.stamina>0.02 && moving;
   pl.stamina = clamp(pl.stamina + (pl.sprinting?-pl.stamDrain:pl.stamRegen), 0, 1);
-  const ACC=pl.sprinting?1.25:1.0, MAX=(pl.maxBase*0.92)*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  const ACC=pl.sprinting?1.25:1.0; let MAX=(pl.maxBase*0.92)*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  if(gameMode==='keepaway' && ball.owner===pl.who) MAX*=0.75;   // ball-holder is 25% slower in keep-away
   pl.vx+=ax*ACC; pl.vy+=ay*ACC;
   const sp=Math.hypot(pl.vx,pl.vy);
   if(sp>MAX){pl.vx=pl.vx/sp*MAX; pl.vy=pl.vy/sp*MAX;}
@@ -1259,19 +1280,33 @@ function applyMoveAI(pl,ax,ay,sprint){
 }
 
 // ---- possession: ball softly sticks to the controller (dribble & spin) ----
+function grabCap(pl){ return PLAYER_R+BALL_R+11; }  // identical control box for both characters — no steal/retain advantage
+// keep-away: shoot it off the goal frame, win it back before the opponent touches it -> bonus seconds
+let rebSeq=0, rebLastSide='', rebSeen=0;   // rebound event counter, streamed so the guest can show the toast too
+function rebChk(who){
+  if(gameMode!=='keepaway' || (ball.rebCD||0)>0) return;
+  if(ball.shooter===who && ball.wallBounce && !ball.oppTouch){
+    if(who==='p') possP+=3; else possT+=3;
+    ball.wallBounce=false; ball.rebCD=240; rebSeq++; rebLastSide=who;   // ~4s cooldown so it can't be farmed
+    showToast('🎯 REBOUND +3s!', who==='p'?'#69db7c':'#ff8787');
+  }
+}
 function updatePossession(){
+  if(ball.rebCD>0) ball.rebCD--;                    // tick the rebound-bonus cooldown
   if(ball.netSide){ ball.owner=null; return; }      // caught in net — leave it
   if(ball.kickLock>0){ball.kickLock--; ball.owner=null; return;}
   const dp=Math.hypot(ball.x-players.p.x, ball.y-players.p.y);
   const dt=oppActive?Math.hypot(ball.x-players.t.x, ball.y-players.t.y):1e9;
-  const cap=PLAYER_R+BALL_R+8, cur=ball.owner;
+  const capP=grabCap(players.p), capT=oppActive?grabCap(players.t):0, cur=ball.owner;
   if(cur){
     const cd=cur==='p'?dp:dt, od=cur==='p'?dt:dp;
-    if(cd>cap+8) ball.owner=null;                       // dribbled too far / knocked loose
-    else if(od<cd-12 && od<cap){ sfxGrunt(players[cur].char); ball.owner=(cur==='p'?'t':'p'); }  // tackled — loser grunts
+    const capCur=cur==='p'?capP:capT, capOpp=cur==='p'?capT:capP;
+    if(cd>capCur+8) ball.owner=null;                       // dribbled too far / knocked loose
+    else if(od<cd-12 && od<capOpp){ sfxGrunt(players[cur].char); const nw=(cur==='p'?'t':'p');
+      if(nw!==ball.shooter) ball.oppTouch=true; ball.owner=nw; }  // tackled — loser grunts
   }else{
-    if(dp<cap && dp<=dt) ball.owner='p';
-    else if(oppActive && dt<cap) ball.owner='t';
+    if(dp<capP && dp<=dt){ ball.owner='p'; rebChk('p'); }
+    else if(oppActive && dt<capT){ ball.owner='t'; rebChk('t'); }
   }
 }
 // players are solid — separate them so they can't overlap
@@ -1304,6 +1339,7 @@ function ballPlayer(pl){
   const dx=ball.x-pl.x, dy=ball.y-pl.y; let d=Math.hypot(dx,dy);
   const min=PLAYER_R+BALL_R;
   if(d<min){
+    if(pl.who!==ball.shooter) ball.oppTouch=true;   // opponent got a touch -> no rebound bonus
     d=d||0.01; const nx=dx/d, ny=dy/d, overlap=min-d;
     ball.x+=nx*overlap; ball.y+=ny*overlap;
     const dot=ball.vx*nx+ball.vy*ny;
@@ -1319,11 +1355,11 @@ function ballWalls(){
   const inMouth=(ball.y>GY0&&ball.y<GY1);
   if(ball.x<FIELD.l+BALL_R){
     if(inMouth && ball.x<FIELD.l){ ball.netSide='L'; scoreGoal('t'); netPhysics('L'); return; }
-    if(!inMouth){ball.x=FIELD.l+BALL_R; if(ball.vx<0)ball.vx*=-0.86;}
+    if(!inMouth){ball.x=FIELD.l+BALL_R; if(ball.vx<0)ball.vx*=-0.86; if(Math.hypot(ball.x-(ball.kickX||0),ball.y-(ball.kickY||0))>220) ball.wallBounce=true;}  // a real driven shot off the goal frame
   }
   if(ball.x>FIELD.r-BALL_R){
     if(inMouth && ball.x>FIELD.r){ ball.netSide='R'; scoreGoal('p'); netPhysics('R'); return; }
-    if(!inMouth){ball.x=FIELD.r-BALL_R; if(ball.vx>0)ball.vx*=-0.86;}
+    if(!inMouth){ball.x=FIELD.r-BALL_R; if(ball.vx>0)ball.vx*=-0.86; if(Math.hypot(ball.x-(ball.kickX||0),ball.y-(ball.kickY||0))>220) ball.wallBounce=true;}  // a real driven shot off the goal frame
   }
 }
 // catch the ball in the net: soft, absorbing, never bounces back onto the pitch
@@ -1393,7 +1429,7 @@ function showToast(txt,col){const el=document.getElementById('toast');
 function endGame(who){
   state='win';
   if(netRole==='host') sendState({st:'win', win:who});   // tell the guest the match is over
-  if(ranked && account) recordResult(netRole ? who==='p' : who==='p');
+  if(ranked && account) recordResult(who==='p');   // endGame is always the local (left) player's perspective
   document.getElementById('winScreen').classList.remove('hide');
   const pName = players? STATS[players.p.char].name : 'PEPE';
   const tName = players? STATS[players.t.char].name : 'TRUMPE';
@@ -1700,7 +1736,8 @@ function loop(ts){
       if(netRole==='host'){ stateSendAcc+=dt; if(stateSendAcc>=0.020){ stateSendAcc=0; sendState(); } }   // ~50Hz snapshots
     }
     // round-trip ping for the on-screen latency readout (both roles)
-    if(netRole){ pingAcc+=dt; if(pingAcc>=1.0){ pingAcc=0; NET.relay({ping:performance.now()}); } }
+    if(netRole){ pingAcc+=dt; if(pingAcc>=0.34){ pingAcc=0; NET.relay({ping:performance.now()}); }   // ~3Hz so the adaptive buffer reacts fast
+      pingDispAcc+=dt; if(pingDispAcc>=1.0){ pingDispAcc=0; NET.rttShown=NET.rtt; } }   // on-screen ping updates 1Hz (no flicker)
   }
   draw();
 }
@@ -1733,8 +1770,8 @@ function showLogin(u){ const a=accounts()[(u||'').toLowerCase()]; if(!a){showReg
 // fully detach the previous online identity so a new/other account signs in cleanly
 async function resetOnlineSession(){
   try{ if(sb) await sb.auth.signOut(); }catch(e){}
-  [presence,inboxChan,notifyChan,chatChan,freqChan].forEach(c=>{ if(c&&sb){ try{sb.removeChannel(c);}catch(e){} } });
-  presence=null; inboxChan=null; notifyChan=null; chatChan=null; freqChan=null;
+  [presence,inboxChan,notifyChan,chatChan,freqChan,chatPairChan].forEach(c=>{ if(c&&sb){ try{sb.removeChannel(c);}catch(e){} } });
+  presence=null; inboxChan=null; notifyChan=null; chatChan=null; freqChan=null; chatPairChan=null;
   sbUser=null; onlineSet=new Set(); friendSet=new Set(); unread={}; cnotes=[]; freqs=[];
 }
 function doRegister(){
@@ -2278,7 +2315,7 @@ function onChallengeResp(p){
     showToast('❌ '+((p&&p.fromName)||'They')+' declined your challenge','#ff8787');
     challengeTarget=null;
     if(NET.ws){ try{NET.send({t:'leave'});NET.ws.close();}catch(e){} }
-    netRole=null; hideAllOverlays(); $('startScreen').classList.remove('hide'); refreshAcctBtn();
+    netRole=null; hideAllOverlays(); $('startScreen').classList.remove('hide'); setMenuDocks(true); refreshAcctBtn();
   }
 }
 $('chAccept').onclick=acceptChallenge;
@@ -2286,6 +2323,7 @@ $('chDecline').onclick=declineChallenge;
 
 // only ever show one full-screen interface at a time
 function hideAllOverlays(){
+  setMenuDocks(false);   // daily tab + server picker only belong on the home screen (re-enabled by enterLobby/gotoMenu)
   document.querySelectorAll('.overlay').forEach(o=>o.classList.add('hide'));
   closeInbox();
 }
@@ -2308,10 +2346,10 @@ function startQuickMatch(){
     $('matchNote').textContent='Struggling to find players on this server — still searching. Invite a mate, or tap Cancel.'; } }, 30000);
 }
 function cancelMatch(){ quickMode=false; clearInterval(matchTimer); clearTimeout(quickTimer);
-  try{ NET.send({t:'cancel'}); }catch(_){}
+  try{ NET.intentionalClose=true; NET.send({t:'cancel'}); }catch(_){}
   try{ if(NET.ws) NET.ws.close(); }catch(_){}
   netRole=null;
-  $('matchScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); }
+  $('matchScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); }
 // ---- PLAY hub: one entry point, three distinct modes (no overlap) ----
 function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.remove('hide'); }
 $('playBtn').onclick=openModeSelect;
@@ -2355,19 +2393,24 @@ function seg(id,attr,cb){document.querySelectorAll('#'+id+' button').forEach(b=>
 
 // ---- Character select (+ practice options) ----
 let selChar='pepe', csContext='practice', practiceOpp='cpu', stakeSel=0;
-function paintCharCards(){
-  $('ccPepe').classList.toggle('sel', selChar==='pepe');
-  $('ccTrumpe').classList.toggle('sel', selChar==='trumpe');
+// character carousel — click through one at a time (both players may pick the same one)
+const CHARS=['pepe','trumpe'];
+let charIdx=0;
+function paintCharCards(){   // kept name for callers; renders the carousel
+  const c=CHARS[charIdx], s=STATS[c]; selChar=c;
+  const st=$('charStage'); if(st) st.setAttribute('data-char', c);
+  const bi=$('charBigImg'); if(bi) bi.src = (c==='pepe'?PEPE_SRC:TRUMPE_SRC);
+  const bn=$('charBigName'); if(bn){ bn.textContent=s.name; bn.style.color=(c==='pepe'?'#69db7c':'#ff8787'); }
+  if($('csSpeed')) $('csSpeed').style.width=s.speed*10+'%';
+  if($('csPower')) $('csPower').style.width=s.power*10+'%';
+  if($('csStam'))  $('csStam').style.width=s.stamina*10+'%';
 }
-$('ccPepe').onclick=()=>{ selChar='pepe'; paintCharCards(); };
-$('ccTrumpe').onclick=()=>{ selChar='trumpe'; paintCharCards(); };
+function cycleChar(d){ charIdx=(charIdx+d+CHARS.length)%CHARS.length; paintCharCards(); }
+$('charPrev').onclick=()=>cycleChar(-1);
+$('charNext').onclick=()=>cycleChar(1);
 seg('oppSeg','data-opp',v=>{ practiceOpp=v;
   $('oppDiffRow').style.display = v==='cpu'?'flex':'none'; });
 seg('oppDiffSeg','data-diff',v=>diff=v);
-seg('stakeSeg','data-stake',v=>{ stakeSel=parseInt(v,10)||0;
-  if($('stakeHint')) $('stakeHint').textContent = stakeSel
-    ? ('Stake '+stakeSel+' $BASED — winner takes '+(stakeSel*2)+'. You have '+myCoins()+'.')
-    : 'Friendly match — no $BASED at stake.'; });
 
 function openSelect(ctx){
   csContext=ctx;
@@ -2378,14 +2421,13 @@ function openSelect(ctx){
     : ctx==='quick' ? 'QUICK MATCH — PICK CHARACTER & MODE'
     : ctx==='host' ? 'YOUR LOBBY — CHOOSE CHARACTER (friend gets the other)'
     : 'PRACTICE — CHOOSE CHARACTER';
-  selChar='pepe'; paintCharCards();
+  charIdx=0; paintCharCards();
   gameMode='goals';
   document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-mode')==='goals'));
   if($('modeHint')) $('modeHint').textContent='First to most goals in 60s.';
   $('oppDiffRow').style.display = practiceOpp==='cpu'?'flex':'none';
   // the stake is chosen on its own screen (Wager Mode) — never an inline option here.
   if(ctx!=='wager') stakeSel=0;
-  if($('stakeRow')) $('stakeRow').style.display='none';
   if(ctx==='wager' && !sbUser) ensureOnline();   // make sure our online id is ready before queuing
 }
 $('selBackBtn').onclick=()=>{ $('selectScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
@@ -2410,7 +2452,7 @@ $('selStartBtn').onclick=()=>{
 $('practiceBtn').onclick=()=>openSelect('practice');
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
-let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, gp=null;
+let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;
 // active match wager ($BASED). matchId is a value BOTH peers agree on (lobby code + host nonce).
 let wager={amount:0, oppId:null, matchId:null, settled:false};
 // how this online match was set up: 'quick' (guest picked its own stake -> use min of both)
@@ -2428,9 +2470,13 @@ function predictGuestSelf(){
   if(keys['w'])ay-=1; if(keys['s'])ay+=1; if(keys['a'])ax-=1; if(keys['d'])ax+=1;
   if(joyActive){ax+=joyVec.x;ay+=joyVec.y;}
   const m=Math.hypot(ax,ay); if(m>1){ax/=m;ay/=m;}
-  const t=players.t, sprint=keys['shiftleft']||keys['shift'];
-  const MAX=t.maxBase*(sprint?SPRINT_MULT:1);
-  gp.vx+=ax; gp.vy+=ay;
+  const t=players.t;
+  // mirror applyMove on the host: no sprint on empty stamina, and the same 1.25 accel ramp,
+  // so the prediction doesn't run faster than the authoritative sim and get yanked back.
+  const sprint=(keys['shiftleft']||keys['shift']) && (t.stamina!=null ? t.stamina>0.02 : true) && m>0.1;
+  const ACC=sprint?1.25:1.0;
+  const MAX=t.maxBase*(sprint?SPRINT_MULT:1)*((gameMode==='keepaway'&&ball.owner==='t')?0.75:1);
+  gp.vx+=ax*ACC; gp.vy+=ay*ACC;
   const sp=Math.hypot(gp.vx,gp.vy); if(sp>MAX){gp.vx=gp.vx/sp*MAX; gp.vy=gp.vy/sp*MAX;}
   gp.vx*=0.84; gp.vy*=0.84; gp.x+=gp.vx; gp.y+=gp.vy;
   confineRound(gp,PLAYER_R);
@@ -2452,7 +2498,7 @@ function predictGuestSelf(){
   else { t.charging=false; t.charge=0; }
 }
 const NET = {
-  ws:null, role:null,
+  ws:null, role:null, intentionalClose:false, reconnTries:0,
   connect(then){
     const url=$('netUrl').value.trim();
     if(!/^wss?:\/\//.test(url)){ $('netErr').textContent='Enter your lobby URL (wss://…).'; return; }
@@ -2461,8 +2507,22 @@ const NET = {
     try{ this.ws=new WebSocket(url); }catch(e){ $('netErr').textContent='Could not connect.'; return; }
     this.ws.onopen=()=>{ $('netStatus').textContent='Connected to lobby.'; then&&then(); };
     this.ws.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data);}catch{return;} handleNet(m); };
-    this.ws.onclose=()=>{ onPeerGone('Connection closed.'); };
+    this.ws.onclose=()=>this.handleClose();
     this.ws.onerror=()=>{ $('netErr').textContent='Connection error — check the URL.'; };
+  },
+  // a drop mid-match no longer instantly forfeits — try to rejoin the same room first
+  handleClose(){
+    if(this.intentionalClose){ this.intentionalClose=false; return; }
+    if(state==='play' && netRole && this.code){
+      if(this.reconnTries>=5){ onPeerGone('Could not reconnect.'); return; }
+      this.reconnTries++;
+      showToast('📶 Reconnecting… ('+this.reconnTries+'/5)','#ffd43b');
+      const d=Math.min(500*this.reconnTries, 2500);
+      setTimeout(()=>{ if(state!=='play') return;
+        this.connect(()=>this.send({t:'rejoin', code:this.code, role:netRole})); }, d);
+      return;
+    }
+    onPeerGone('Connection closed.');
   },
   send(o){ if(this.ws&&this.ws.readyState===1) this.ws.send(JSON.stringify(o)); },
   relay(d){ this.send({t:'relay', d}); },
@@ -2497,19 +2557,27 @@ function handleNet(m){
     if(account) NET.relay({hello:{name:account.username}}); }
   else if(m.t==='peer-joined'){ $('netStatus').textContent='Friend connected! Choose your character…';
     setTimeout(()=>openSelect('host'), 600); }
-  else if(m.t==='error'){ $('netErr').textContent=m.msg||'Lobby error.'; }
+  else if(m.t==='error'){ if(NET.reconnTries>0){ NET.reconnTries=0; onPeerGone('Match ended.'); } else $('netErr').textContent=m.msg||'Lobby error.'; }
+  else if(m.t==='resumed'){ NET.reconnTries=0; showToast('✅ Reconnected!','#69db7c'); }        // we rejoined the room
+  else if(m.t==='peer-dropped'){ showToast('📶 Opponent reconnecting…','#ffd43b'); }            // they dropped — wait, don't forfeit
+  else if(m.t==='peer-back'){ showToast('✅ Opponent reconnected!','#69db7c'); }                 // they came back
   else if(m.t==='peer-left'){ onPeerGone('Your friend disconnected.'); }
   else if(m.t==='relay'){ const d=m.d||{};
     if(d.hello){ NET.peerName=d.hello.name; }
     else if(d.start){ humanChar=d.start.hostChar; NET.peerName=d.start.hostName||NET.peerName; gameMode=d.start.mode||'goals';
       setupGuestWager(d.start); beginGameOnline('guest'); }
-    else if(d.wagerAck){                                  // host learns the guest's id + agreed stake
+    else if(d.wagerAck){                                  // host learns the guest's id, stake + character
+      if(d.wagerAck.char){ oppChar=d.wagerAck.char;       // guest's chosen character (may equal host's)
+        if(netRole==='host' && players && players.t && players.t.char!==oppChar){   // ack arrived after reset() -> fix avatar+stats+labels
+          const t=players.t; players.t=mkPlayer(t.x,t.y,'t',oppChar);
+          players.t.vx=t.vx; players.t.vy=t.vy; players.t.aim=t.aim; players.t.face=t.face; players.t.stamina=t.stamina;
+          const tc=$('tCard').querySelector('.pc-name'); if(tc) tc.textContent=(NET.peerName||STATS[oppChar].name);
+          $('tTeam').textContent=STATS[oppChar].abbr; } }
       let amount=d.wagerAck.amount||0; const oppId=d.wagerAck.guestId||null;
       const intended = onlineWagerEnabled() && stakeSel>0;
       if(!onlineWagerEnabled() || !sbUser || !oppId || amount>myCoins()) amount=0;
       wager.oppId=oppId; wager.amount=amount;
-      if(amount>0) showToast('💰 Wager '+amount+' $BASED — winner takes the pot','#ffd43b');
-      else if(intended && !oppId) showToast('🎮 Opponent is a guest — casual match, no wager','#9bf6a8');
+      if(intended && !oppId && !amount) showToast('🎮 Opponent is a guest — casual match','#9bf6a8');  // only when it changes their expectation
       updatePotTag(); }
     else if(d.input){ NET.guestInput=d.input; }        // host receives guest input
     else if(d.state){ pushNetState(d.state); }          // guest buffers snapshot for smoothing
@@ -2517,10 +2585,11 @@ function handleNet(m){
     else if(d.left){ peerLeft=true; greyRematch('Your friend went back to the menu.'); }
     else if(d.ping!=null){ NET.relay({pong:d.ping}); }   // bounce it back so the peer can measure RTT
     else if(d.pong!=null){ const rtt=Math.round(performance.now()-d.pong);
-      // smooth the ping reading, then size the interpolation buffers to it
-      NET.rtt = NET.rtt==null ? rtt : Math.round(NET.rtt*0.7 + rtt*0.3);
+      // asymmetric EMA: grow the cushion FAST on a spike, relax it slowly — so a ping
+      // jump expands the buffer within ~1s instead of stuttering for several seconds.
+      NET.rtt = NET.rtt==null ? rtt : (rtt>NET.rtt ? Math.round(NET.rtt*0.4+rtt*0.6) : Math.round(NET.rtt*0.85+rtt*0.15));
       INTERP_DELAY = clamp(48 + NET.rtt*0.32, 60, 150);   // bigger cushion on higher-latency links
-      BALL_DELAY   = clamp(18 + NET.rtt*0.10, 20, 55); }
+      BALL_DELAY   = clamp(28 + NET.rtt*0.10, 30, 60); }   // >=1.5 snapshot intervals so jitter blends, not extrapolates
   }
 }
 // remember the last few real people you played online
@@ -2599,8 +2668,8 @@ NET.create=function(){ this.send({t:'create'}); };
 $('joinLobbyBtn').onclick=()=>{ const c=$('joinCode').value.trim().toUpperCase();
   if(c.length<4){ $('netErr').textContent='Enter the 4-letter code.'; return; }
   audioInit(); NET.connect(()=>NET.send({t:'join',code:c})); };
-$('onlineBackBtn').onclick=()=>{ if(NET.ws){ NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
-  netRole=null; $('onlineScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
+$('onlineBackBtn').onclick=()=>{ if(NET.ws){ NET.intentionalClose=true; NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
+  netRole=null; $('onlineScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); };
 
 // one-tap invite link: carries both the join code and the lobby server URL
 function buildInvite(code){
@@ -2656,11 +2725,13 @@ function setupGuestWager(start){
   let amount = Math.max(0, Math.min(hostStake, myStake));
   if(!onlineWagerEnabled() || !sbUser || !hostId || amount>myCoins()) amount=0;
   const myId = (sbUser && account && !account.guest) ? sbUser.id : null;  // guests stay casual
+  // our character: quick-match guests picked one; friend guests (no select screen) take the opposite.
+  const hostChar = start.hostChar || 'pepe';
+  const guestChar = (onlineKind==='quick') ? selChar : (hostChar==='pepe'?'trumpe':'pepe');
+  oppChar = guestChar;   // we (guest) control players.t = guestChar; players.p = host's char
   wager = { amount, oppId:hostId, matchId:start.matchId||null, settled:false };
-  NET.relay({ wagerAck:{ amount, stake:myStake, guestId:myId } });
-  if(amount>0) showToast('💰 Wager '+amount+' $BASED — winner takes the pot','#ffd43b');
-  else if(onlineWagerEnabled() && myStake>0 && !hostId) showToast('🎮 Opponent is a guest — casual match, no wager','#9bf6a8');
-  updatePotTag();
+  NET.relay({ wagerAck:{ amount, stake:myStake, guestId:myId, char:guestChar } });   // tell host our character
+  updatePotTag();   // wager is shown in the framed match banner, not a floating toast
 }
 // settle at match end: both peers report their perceived winner; coins (faucet + any
 // wager) move only when BOTH confirm the same match — see sql/social-schema-add5.sql.
@@ -2693,6 +2764,7 @@ async function settleWager(win){
 function beginGameOnline(role){ showLoadingThen(()=>_beginGameOnline(role)); }   // 5s loading, then start
 function _beginGameOnline(role){
   netRole=role; oppActive=true; ranked=true; mode='online';
+  NET.reconnTries=0; NET.intentionalClose=false;   // fresh match — reset reconnect state
   netKickPrev=false; NET.state=null; NET.buf=[]; stateSendAcc=0; gInputAcc=0;
   NET.guestInput={ax:0,ay:0,aim:Math.PI,sprint:false,kick:false};
   recordOpponent(NET.peerName);
@@ -2700,8 +2772,8 @@ function _beginGameOnline(role){
     .forEach(s=>$(s).classList.add('hide'));
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
   $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide'); setMenuDocks(false); $('pCard').classList.remove('hide'); $('tCard').classList.remove('hide');
-  $('pauseBtn').textContent='❚❚'; $('touch').style.display='none';
-  const oc=humanChar==='pepe'?'trumpe':'pepe';
+  $('pauseBtn').textContent='❚❚'; enterMatchChrome();
+  const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
   $('pCard').querySelector('.pc-name').textContent = role==='host' ? (account?account.username:STATS[humanChar].name) : (NET.peerName||STATS[humanChar].name);
   $('tCard').querySelector('.pc-name').textContent = role==='guest' ? (account?account.username:STATS[oc].name) : (NET.peerName||STATS[oc].name);
   $('pTeam').textContent=STATS[humanChar].abbr; $('tTeam').textContent=STATS[oc].abbr;
@@ -2734,7 +2806,7 @@ function sendState(extra){
     p:{x:p.x,y:p.y,aim:p.aim,face:p.face,char:p.char,stam:p.stamina,ch:p.charge,cg:p.charging?1:0},
     t:{x:t.x,y:t.y,aim:t.aim,face:t.face,char:t.char,stam:t.stamina,ch:t.charge,cg:t.charging?1:0},
     b:{x:ball.x,y:ball.y,roll:ball.roll||0,dir:ball.dir||0,net:ball.netSide||0,own:ball.owner||0},
-    s:[score.p,score.t], tl:timeLeft, gl:golden, pp:possP, tp:possT, gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0
+    s:[score.p,score.t], tl:timeLeft, gl:golden, pp:possP, tp:possT, gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide
   }});
 }
 // guest buffers snapshots and renders in the past, gliding between them.
@@ -2759,11 +2831,12 @@ function sampleAt(delay){
   const latest=buf[buf.length-1].s; return {s:latest, sb:latest, k:0};
 }
 function applyNetState(){
-  const buf=NET.buf; if(!buf.length) return;
+  const buf=NET.buf; if(buf.length<2) return;   // need 2 snapshots to interpolate — don't paint a lone stale frame
   const latest=buf[buf.length-1].s;
   // discrete fields come from the newest snapshot (no lag on score/clock/result)
   score.p=latest.s[0]; score.t=latest.s[1]; timeLeft=latest.tl; golden=latest.gl;
   if(latest.gm) gameMode=latest.gm; if(latest.pp!=null) possP=latest.pp; if(latest.tp!=null) possT=latest.tp;
+  if(latest.rq!=null && latest.rq>rebSeen){ rebSeen=latest.rq; showToast('🎯 REBOUND +3s!', latest.rs==='p'?'#69db7c':'#ff8787'); }
   if(latest.hf){ const wasHt=halftime; half=latest.hf; halftime=!!latest.ht;
     setMeta(halftime?'HALF TIME':halfLabel());
     if(halftime && !wasHt) showHalftime();          // host hit half-time -> show our 5s screen + freeze
@@ -2817,6 +2890,8 @@ async function ensureOnline(){
   return true;
 }
 // ---- live "playing now" counter: every open tab joins a shared presence channel ----
+// tabChan is tab-scoped by design (random key, payload {t,region} only — never identity),
+// so it deliberately survives account switches and is NOT torn down in resetOnlineSession.
 let tabChan=null, liveCount=0;
 function updateLiveCount(){
   const n=Math.max(1, liveCount||0);
@@ -2839,6 +2914,11 @@ function startPresence(){
   presence=sb.channel('online', {config:{presence:{key:sbUser.id}}});
   presence.on('presence',{event:'sync'},()=>{
     onlineSet=new Set(Object.keys(presence.presenceState()));
+    const m=DB.get('sh_lastseen')||{}, now=Date.now();   // remember when we last saw each person online
+    onlineSet.forEach(id=>{ m[id]=now; }); DB.set('sh_lastseen', m);
+    if(chatPeer && !$('chatScreen').classList.contains('hide')){
+      $('chatStatus').textContent=chatStatusText(chatPeer.id);
+      $('chatDot').className='cdot'+(onlineSet.has(chatPeer.id)?' online':''); }
     if(!$('socialScreen').classList.contains('hide')) renderFriends();
   });
   presence.subscribe(s=>{ if(s==='SUBSCRIBED') presence.track({u:sbUser.username}); });
@@ -2925,7 +3005,18 @@ async function acceptFriend(friendId){
   refreshServerNotifs(); renderFriends();
 }
 
-// ----- chat -----
+// ----- chat (timestamps, typing, seen receipts, last-online) -----
+let chatPairChan=null, peerTypingT=null, typingSentAt=0;
+function fmtChatTime(ts){ const d=new Date(ts); let h=d.getHours(); const m=d.getMinutes();
+  const ap=h>=12?'pm':'am'; h=h%12||12; return h+':'+String(m).padStart(2,'0')+ap; }
+function relTime(t){ const s=Math.max(0,Math.floor((Date.now()-t)/1000));
+  if(s<60)return 'just now'; if(s<3600)return Math.floor(s/60)+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
+function chatStatusText(fid){
+  if(onlineSet.has(fid)) return '🟢 online now';
+  const t=(DB.get('sh_lastseen')||{})[fid];
+  return t ? ('⚪ last seen '+relTime(t)) : '⚪ offline';
+}
 async function openChat(friendId, name){
   chatPeer={id:friendId, name};
   markRead(friendId);
@@ -2935,28 +3026,50 @@ async function openChat(friendId, name){
   $('chatWith').onclick=()=> openPubProfile(name, ()=>openChat(friendId,name));
   $('chatInput').value='';
   $('chatDot').className='cdot'+(onlineSet.has(friendId)?' online':'');
+  $('chatStatus').textContent=chatStatusText(friendId);
+  $('typingName').textContent=name; $('typingInd').classList.add('hide');
   const log=$('chatLog'); log.innerHTML='<div class="empty">Loading…</div>';
   const { data } = await sb.rpc('chat_with',{p_other:friendId, p_limit:50});
   log.innerHTML='';
-  (data||[]).slice().reverse().forEach(m=> addBubble(m.sender===sbUser.id, m.body));
+  (data||[]).slice().reverse().forEach(m=> addBubble(m.sender===sbUser.id, m.body, m.created_at, 'Sent'));
   log.scrollTop=log.scrollHeight;
-  subscribeChat();
+  subscribeChat(); subscribeChatPair(friendId);
 }
-function addBubble(mine, text){
-  const b=document.createElement('div'); b.className='bub '+(mine?'me':'them'); b.textContent=text;
+function addBubble(mine, text, ts, status){
+  const b=document.createElement('div'); b.className='bub '+(mine?'me':'them');
+  const tx=document.createElement('span'); tx.className='bub-txt'; tx.textContent=text; b.appendChild(tx);
+  const meta=document.createElement('span'); meta.className='bub-meta';
+  meta.innerHTML=(ts?fmtChatTime(ts):'')+(mine?' · <span class="bstat">'+(status||'Sent')+'</span>':'');
+  b.appendChild(meta);
   $('chatLog').appendChild(b); $('chatLog').scrollTop=$('chatLog').scrollHeight;
+  return b;
 }
+function markMineSeen(){ $('chatLog').querySelectorAll('.bub.me .bstat').forEach(s=>{ s.textContent='Seen ✓✓'; s.classList.add('seen'); }); }
+function showPeerTyping(){ const t=$('typingInd'); if(!t)return; t.classList.remove('hide');
+  $('chatLog').scrollTop=$('chatLog').scrollHeight;
+  clearTimeout(peerTypingT); peerTypingT=setTimeout(()=>t.classList.add('hide'), 2500); }
 function subscribeChat(){
   if(chatChan){ sb.removeChannel(chatChan); chatChan=null; }
   chatChan=sb.channel('dm:'+sbUser.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'recipient=eq.'+sbUser.id},
-      payload=>{ const m=payload.new; if(chatPeer && m.sender===chatPeer.id) addBubble(false, m.body); })
+      payload=>{ const m=payload.new; if(chatPeer && m.sender===chatPeer.id){
+        $('typingInd').classList.add('hide');
+        addBubble(false, m.body, m.created_at);
+        if(chatPairChan){ try{ chatPairChan.send({type:'broadcast',event:'seen',payload:{}}); }catch(e){} }  // I saw it
+      }})
     .subscribe();
+}
+function subscribeChatPair(otherId){
+  if(chatPairChan){ try{sb.removeChannel(chatPairChan);}catch(e){} chatPairChan=null; }
+  chatPairChan=sb.channel('cp:'+[sbUser.id,otherId].sort().join('_'), {config:{broadcast:{self:false}}})
+    .on('broadcast',{event:'typing'}, ()=>showPeerTyping())
+    .on('broadcast',{event:'seen'},  ()=>markMineSeen())
+    .subscribe(s=>{ if(s==='SUBSCRIBED' && chatPairChan){ try{ chatPairChan.send({type:'broadcast',event:'seen',payload:{}}); }catch(e){} } });
 }
 async function sendChat(){
   const t=$('chatInput').value.trim(); if(!t||!chatPeer) return;
   $('chatInput').value='';
-  addBubble(true, t);
+  addBubble(true, t, Date.now(), 'Sent');
   await sb.from('messages').insert({sender:sbUser.id, recipient:chatPeer.id, body:t});
   bumpStat('msgs');
 }
@@ -2977,6 +3090,8 @@ $('socialBackBtn').onclick=()=>{ $('socialScreen').classList.add('hide'); $('sta
 $('chatBackBtn').onclick=()=>{ $('chatScreen').classList.add('hide'); openSocial(); };
 $('chatSendBtn').onclick=sendChat;
 $('chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
+$('chatInput').addEventListener('input',()=>{ if(!chatPairChan) return; const now=performance.now();
+  if(now-typingSentAt>1200){ typingSentAt=now; try{ chatPairChan.send({type:'broadcast',event:'typing',payload:{}}); }catch(e){} } });
 
 // ---- Leaderboard (online when hosted; local accounts otherwise) ----
 function renderLocalBoard(){
@@ -3049,10 +3164,18 @@ function showMatchBanner(){
   $('mbWager').textContent = (wager && wager.amount>0) ? ('💰 Wagering '+wager.amount+' $BASED') : '';
   b.classList.remove('hide');
   clearTimeout(_bannerTimer);
-  _bannerTimer=setTimeout(()=>b.classList.add('hide'), 3200);
+  _bannerTimer=setTimeout(()=>b.classList.add('hide'), 2000);
 }
 
-function beginGame(){ showLoadingThen(_beginGame); }       // 5s loading screen, then start
+// touch devices get the on-screen joystick + KICK button (the #touch layer is display:none by default)
+const IS_TOUCH = (typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches) || (typeof window!=='undefined' && 'ontouchstart' in window);
+function enterMatchChrome(){
+  $('xBtn').classList.add('hide');                          // X link off during a match (was overlapping the scorebug)
+  $('touch').style.display = IS_TOUCH ? 'block' : 'none';   // show the joystick + KICK on phones
+  const b = IS_TOUCH ? '156px' : '10px';                    // lift the pot/ping pills above the joystick on touch
+  if($('potTag')) $('potTag').style.bottom=b; if($('pingTag')) $('pingTag').style.bottom=b;
+}
+function beginGame(){ oppChar=null; showLoadingThen(_beginGame); }   // practice/local: opponent is the opposite character
 function _beginGame(){
   ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','profileScreen','inboxScreen']
     .forEach(s=>$(s).classList.add('hide'));
@@ -3061,8 +3184,8 @@ function _beginGame(){
   $('pCard').classList.remove('hide');
   $('tCard').classList.toggle('hide', !oppActive);
   $('pauseBtn').textContent='❚❚';
-  $('touch').style.display='none';
-  const oc = humanChar==='pepe'?'trumpe':'pepe';
+  enterMatchChrome();
+  const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
   $('pCard').querySelector('.pc-name').textContent = account? account.username : STATS[humanChar].name;
   $('tCard').querySelector('.pc-name').textContent = ranked? 'CPU' : STATS[oc].name;
   $('pTeam').textContent = STATS[humanChar].abbr;
@@ -3078,8 +3201,9 @@ function togglePause(){
     $('pauseScreen').classList.add('hide'); $('pauseBtn').textContent='❚❚'; }
 }
 function gotoMenu(){
-  if(netRole && NET.ws){ NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
-  netRole=null; gp=null; resetWager();
+  if(netRole && NET.ws){ NET.intentionalClose=true; NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
+  netRole=null; gp=null; resetWager(); oppChar=null;
+  $('touch').style.display='none'; $('xBtn').classList.remove('hide');
   clearTimeout(htTimer); hideHalftime(); halftime=false;
   clearTimeout(_bannerTimer); $('matchBanner').classList.add('hide');
   clearTimeout(_loadTimer); $('loadingScreen').classList.add('hide');
@@ -3134,8 +3258,7 @@ $('winAddFriend').onclick=async ()=>{
   } else openSocial();
 };
 
-// character preview images on the select screen
-$('imgPepe').src=PEPE_SRC; $('imgTrumpe').src=TRUMPE_SRC;
+// character carousel renders its own image via paintCharCards()
 { const lp=$('loadPepe'); if(lp) lp.src=PEPE_SRC; }   // preload the spinning loader sprite
 
 resize(); reset();

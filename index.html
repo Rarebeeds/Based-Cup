@@ -291,6 +291,9 @@
     letter-spacing:1px;pointer-events:auto;box-shadow:0 5px 0 #c92a2a}
   #kickBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #c92a2a}
   .hide{display:none!important}
+  /* $BASED currency icon — a soccer ball with a dollar sign (replaces the coin emoji) */
+  .bcoin{display:inline-block;width:1.05em;height:1.05em;vertical-align:-0.18em;
+    background:url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCc+PGNpcmNsZSBjeD0nMTInIGN5PScxMicgcj0nMTAuNScgZmlsbD0nI2ZmZicgc3Ryb2tlPScjMTIyMzFhJyBzdHJva2Utd2lkdGg9JzEuNicvPjxwb2x5Z29uIHBvaW50cz0nNiw4LjYgOCw3LjEgOS43LDguNSA4LjksMTAuOCA2LjUsMTAuOCcgZmlsbD0nIzE1MzMxZScvPjxwb2x5Z29uIHBvaW50cz0nMTgsOC42IDE2LDcuMSAxNC4zLDguNSAxNS4xLDEwLjggMTcuNSwxMC44JyBmaWxsPScjMTUzMzFlJy8+PHBvbHlnb24gcG9pbnRzPScxMiwxOC44IDkuNiwxNyAxMC41LDE0LjQgMTMuNSwxNC40IDE0LjQsMTcnIGZpbGw9JyMxNTMzMWUnLz48dGV4dCB4PScxMicgeT0nMTUuMScgZm9udC1mYW1pbHk9J0FyaWFsLEhlbHZldGljYSxzYW5zLXNlcmlmJyBmb250LXNpemU9JzEyJyBmb250LXdlaWdodD0nOTAwJyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBmaWxsPScjMGY3YTM2Jz4kPC90ZXh0Pjwvc3ZnPg==) center/contain no-repeat}
   .toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     z-index:15;font-size:min(13vw,90px);font-weight:900;letter-spacing:4px;
     color:#fff;text-shadow:0 4px 0 #000,0 0 30px rgba(255,212,59,.8);
@@ -303,6 +306,19 @@
   #loadText .dots{color:#69db7c}
   #loadPepe{position:absolute;right:26px;bottom:26px;width:74px;height:74px;object-fit:contain;
     transform-origin:50% 50%;animation:spin 1s linear infinite;filter:drop-shadow(0 0 12px rgba(105,219,124,.5))}
+  /* daily tasks bar (main menu) */
+  #dailyBar{background:#0a1d12;border:1px solid #1f5234;border-radius:12px;padding:9px 12px;margin:10px 0;text-align:left}
+  #dailyBar .dhead{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#9bf6a8;font-weight:bold;margin-bottom:5px;letter-spacing:.5px}
+  #dailyReset{color:#7fb893;font-weight:normal}
+  .dtask{margin:7px 0;font-size:13px;color:#cdebd6}
+  .dtask .dtop{display:flex;justify-content:space-between;gap:8px}
+  .dtask .dtop b{color:#ffd43b;white-space:nowrap}
+  .dtask.done .dtop span{color:#69db7c}
+  .dtask.done .dtop b::after{content:' ✓';color:#69db7c}
+  .dbar{height:6px;background:#16331f;border-radius:4px;overflow:hidden;margin-top:3px}
+  .dbar>i{display:block;height:100%;background:linear-gradient(90deg,#69db7c,#ffd43b);transition:width .3s}
+  /* region picker on the main menu */
+  #mainRegionRow{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12px;color:#9bf6a8;justify-content:center}
   /* mode-entry banner (small framed card, centre screen) */
   #matchBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:120;
     pointer-events:none;min-width:min(78vw,320px);text-align:center;
@@ -320,7 +336,7 @@
 <body>
 <div id="wrap"><div id="stage">
   <canvas id="cv"></canvas>
-  <button id="acctBtn" class="hide"><img id="acctPic" alt=""><span id="acctName">player</span><span id="acctLvl" class="lvlchip">Lv1</span><span id="acctCoins" class="lvlchip hide" style="background:#3a2e0a;color:#ffd43b">🪙0</span></button>
+  <button id="acctBtn" class="hide"><img id="acctPic" alt=""><span id="acctName">player</span><span id="acctLvl" class="lvlchip">Lv1</span><span id="acctCoins" class="lvlchip hide" style="background:#3a2e0a;color:#ffd43b"></span></button>
   <button id="bellBtn" class="hide">🔔<span id="bellCount" class="bellCount hide">0</span></button>
   <a id="xBtn" class="hide" href="https://x.com/BasedCup1" target="_blank" rel="noopener noreferrer" title="Follow Based Cup on X"
      style="position:absolute;top:12px;right:62px;z-index:55;background:rgba(10,20,34,.85);border:1px solid rgba(255,255,255,.16);border-radius:50%;width:42px;height:42px;font-size:18px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;font-family:sans-serif">𝕏</a>
@@ -330,8 +346,9 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b26 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b29 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.35);padding:3px 10px;border-radius:8px"></div>
+  <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
   <div id="pingTag" class="hide" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:11px;color:rgba(180,255,200,.7);z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.3);padding:2px 8px;border-radius:8px"></div>
 
   <div id="hud" class="hide">
@@ -395,7 +412,7 @@
   <!-- PROFILE -->
   <div class="overlay hide" id="profileScreen">
     <div class="card" style="position:relative">
-      <div id="profCoinsTop" style="position:absolute;top:10px;left:12px;font-weight:bold;color:#ffd43b;background:#3a2e0a;border:1px solid #6b5410;border-radius:10px;padding:4px 10px;font-size:13px">🪙 0</div>
+      <div id="profCoinsTop" style="position:absolute;top:10px;left:12px;font-weight:bold;color:#ffd43b;background:#3a2e0a;border:1px solid #6b5410;border-radius:10px;padding:4px 10px;font-size:13px"><span class="bcoin"></span> 0</div>
       <div class="formTitle">PROFILE</div>
       <div class="avatarWrap">
         <img id="profilePic" class="avatarBig" alt="">
@@ -501,7 +518,8 @@
   <div class="overlay hide" id="startScreen">
     <div class="card">
       <div class="gameTitle">BASED&nbsp;CUP</div>
-      <div class="sub" style="margin-bottom:12px">⚽ online soccer showdown ⚽</div>
+      <div class="sub" style="margin-bottom:6px">⚽ online soccer showdown ⚽</div>
+      <div id="liveCountMenu" style="margin-bottom:12px;font-size:13px;color:#69db7c;font-weight:bold">👁 <b>—</b> playing now</div>
 
       <div id="guestBanner" class="hide" style="background:#1c3b27;border:1px solid #2f7a4a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#cdebd6">
         🎁 You're playing as a guest. Add your wallet to enter the leaderboard giveaway — <b>0.1 SOL every hour</b>!
@@ -513,11 +531,24 @@
 
       <div class="row"><button class="btn" id="storeBtn" style="width:100%;background:linear-gradient(180deg,#6a45b0,#4a2f86);border:2px solid #b08cff">🛒 STORE</button></div>
 
+      <div id="dailyBar">
+        <div class="dhead"><span>📋 DAILY TASKS</span><span id="dailyReset">resets in —</span></div>
+        <div id="dailyList"></div>
+      </div>
+
       <div class="orline"><span>more</span></div>
       <div class="lobbyGrid">
         <button class="btn grey" id="practiceBtn">🎯 PRACTICE</button>
         <button class="btn blue" id="socialBtn">👥 SOCIAL</button>
         <button class="btn yellow" id="boardBtn">🏆 LEADERBOARD</button>
+      </div>
+
+      <div id="mainRegionRow">
+        <span>🌐 Server:</span>
+        <div class="seg" id="mainRegionSeg" style="flex:none">
+          <button data-region="syd" class="on">🇦🇺 Sydney</button>
+          <button data-region="sin">🇸🇬 Singapore</button>
+        </div>
       </div>
 
       <div class="panel">
@@ -540,7 +571,7 @@
       <div class="formTitle">▶ PLAY</div>
       <div class="sub" style="margin-bottom:12px">Choose how you want to play.</div>
       <div class="row"><button class="btn big-btn" id="msWagerBtn" style="background:linear-gradient(180deg,#caa11a,#9c7a00);border:2px solid #ffd43b">💰 WAGER MODE</button></div>
-      <div class="muted">stake 🪙 $BASED — winner takes the pot</div>
+      <div class="muted">stake <span class="bcoin"></span> $BASED — winner takes the pot</div>
       <div class="row"><button class="btn" id="msQuickBtn" style="width:100%">⚡ QUICK MATCH</button></div>
       <div class="muted">ranked online · friendly, no wager</div>
       <div class="row"><button class="btn" id="msFriendBtn" style="width:100%">🎮 PLAY A FRIEND</button></div>
@@ -554,10 +585,10 @@
     <div class="card">
       <div class="formTitle">💰 WAGER MODE</div>
       <div class="sub" style="margin-bottom:6px">Choose your stake — winner takes the pot.</div>
-      <div class="muted" style="margin-bottom:10px">You have 🪙<b id="wsBal" style="color:#ffd43b">0</b> $BASED</div>
-      <div class="row"><button class="btn big-btn wsAmt" data-amt="50">🪙 50</button></div>
-      <div class="row"><button class="btn wsAmt" data-amt="100" style="width:100%">🪙 100</button></div>
-      <div class="row"><button class="btn wsAmt" data-amt="250" style="width:100%">🪙 250</button></div>
+      <div class="muted" style="margin-bottom:10px">You have <span class="bcoin"></span><b id="wsBal" style="color:#ffd43b">0</b> $BASED</div>
+      <div class="row"><button class="btn big-btn wsAmt" data-amt="50"><span class="bcoin"></span> 50</button></div>
+      <div class="row"><button class="btn wsAmt" data-amt="100" style="width:100%"><span class="bcoin"></span> 100</button></div>
+      <div class="row"><button class="btn wsAmt" data-amt="250" style="width:100%"><span class="bcoin"></span> 250</button></div>
       <div class="err" id="wsErr"></div>
       <div class="row" style="margin-top:10px"><button class="btn ghost" id="wsBackBtn">BACK</button></div>
     </div>
@@ -567,10 +598,10 @@
   <div class="overlay hide" id="storeScreen">
     <div class="card">
       <div class="formTitle">🛒 STORE</div>
-      <div class="sub" style="margin-bottom:10px">Top up your 🪙 $BASED balance.</div>
-      <div class="statLine"><span>🪙 1,000 $BASED</span><button class="btn grey disabled" id="buy1Btn" disabled style="padding:6px 12px">COMING SOON</button></div>
-      <div class="statLine"><span>🪙 5,500 $BASED</span><button class="btn grey disabled" id="buy2Btn" disabled style="padding:6px 12px">COMING SOON</button></div>
-      <div class="statLine"><span>🪙 30,000 $BASED</span><button class="btn grey disabled" id="buy3Btn" disabled style="padding:6px 12px">COMING SOON</button></div>
+      <div class="sub" style="margin-bottom:10px">Top up your <span class="bcoin"></span> $BASED balance.</div>
+      <div class="statLine"><span><span class="bcoin"></span> 1,000 $BASED</span><button class="btn grey disabled" id="buy1Btn" disabled style="padding:6px 12px">COMING SOON</button></div>
+      <div class="statLine"><span><span class="bcoin"></span> 5,500 $BASED</span><button class="btn grey disabled" id="buy2Btn" disabled style="padding:6px 12px">COMING SOON</button></div>
+      <div class="statLine"><span><span class="bcoin"></span> 30,000 $BASED</span><button class="btn grey disabled" id="buy3Btn" disabled style="padding:6px 12px">COMING SOON</button></div>
       <div class="muted note" style="margin:8px 0 0">Buying $BASED isn't live yet — earn coins by winning online matches for now.</div>
       <div class="row" style="margin-top:10px"><button class="btn ghost" id="storeBackBtn">BACK</button></div>
     </div>
@@ -652,7 +683,7 @@
       </div>
 
       <div id="stakeRow" style="display:none">
-        <div class="orline"><span>🪙 wager</span></div>
+        <div class="orline"><span><span class="bcoin"></span> wager</span></div>
         <div class="row"><div class="seg" id="stakeSeg">
           <button data-stake="0" class="on">FRIENDLY</button>
           <button data-stake="50">50</button>
@@ -1608,7 +1639,7 @@ function loop(ts){
     if(netRole==='guest'){
       // thin client: stream input (throttled), render the host's snapshot smoothly,
       // and locally predict our OWN player so controls feel instant
-      gInputAcc+=dt; if(gInputAcc>=0.030){ gInputAcc=0; sendGuestInput(); }
+      gInputAcc+=dt; if(gInputAcc>=0.022){ gInputAcc=0; sendGuestInput(); }   // ~45Hz input
       applyNetState();
       if(!halftime) predictGuestSelf();   // freeze our own player during the half-time break
       updateHUD();
@@ -1633,10 +1664,10 @@ function loop(ts){
       }
       updateHUD();
       // keep streaming even while frozen so the guest sees ht=1 (freeze) then ht=0 (resume)
-      if(netRole==='host'){ stateSendAcc+=dt; if(stateSendAcc>=0.025){ stateSendAcc=0; sendState(); } }
+      if(netRole==='host'){ stateSendAcc+=dt; if(stateSendAcc>=0.020){ stateSendAcc=0; sendState(); } }   // ~50Hz snapshots
     }
     // round-trip ping for the on-screen latency readout (both roles)
-    if(netRole){ pingAcc+=dt; if(pingAcc>=1.5){ pingAcc=0; NET.relay({ping:performance.now()}); } }
+    if(netRole){ pingAcc+=dt; if(pingAcc>=1.0){ pingAcc=0; NET.relay({ping:performance.now()}); } }
   }
   draw();
 }
@@ -1722,9 +1753,11 @@ async function guestAddWallet(){
   if(!validSol(addr)){ showToast('That is not a valid Solana address.','#ff8787'); return; }
   account.addr=addr; account.guest=false;
   const a=accounts(); a[account.username.toLowerCase()]=account; saveAccts(a);
+  // push the wallet to Supabase now if we're online; otherwise ensureOnline() upserts it next time.
   if(sb && sbUser){ try{ await sb.from('profiles').update({wallet:addr}).eq('id',sbUser.id); }catch(_){} }
+  else if(sb){ try{ await ensureOnline(); }catch(_){} }
   showToast("Wallet added — you're in the hourly 0.1 SOL giveaway! 🎉",'#69db7c');
-  refreshGuestBanner();
+  refreshGuestBanner(); refreshAcctBtn();
 }
 function refreshGuestBanner(){
   const b=$('guestBanner'); if(!b) return;
@@ -1750,19 +1783,20 @@ function refreshAcctBtn(){
   $('acctPic').src=avatarOf(account.username);
   $('acctLvl').textContent='Lv'+levelFromXp(account.xp||0).level;
   const cc=$('acctCoins');
-  if(cc){ if(account.guest){ cc.classList.add('hide'); } else { cc.textContent='🪙'+myCoins(); cc.classList.remove('hide'); } }
+  if(cc){ if(account.guest){ cc.classList.add('hide'); } else { cc.innerHTML=coinIcon()+myCoins(); cc.classList.remove('hide'); } }
   $('acctBtn').classList.remove('hide'); $('bellBtn').classList.remove('hide');
   refreshGuestBanner();
 }
 
 // ---- $BASED coins (in-game currency; mirrored to Supabase profiles) ----
+function coinIcon(){ return '<span class="bcoin"></span>'; }   // soccer-ball-with-$ logo
 function myCoins(){ return (account&&account.coins)||0; }
 function setLocalCoins(n){
   if(!account||n==null) return;
   account.coins=n;
   const a=accounts(), me=a[account.username.toLowerCase()]; if(me){ me.coins=n; saveAccts(a); }
-  const cc=$('acctCoins'); if(cc && !account.guest){ cc.textContent='🪙'+n; cc.classList.remove('hide'); }
-  const pc=$('profCoinsTop'); if(pc) pc.textContent='🪙 '+n;
+  const cc=$('acctCoins'); if(cc && !account.guest){ cc.innerHTML=coinIcon()+n; cc.classList.remove('hide'); }
+  const pc=$('profCoinsTop'); if(pc) pc.innerHTML=coinIcon()+' '+n;
 }
 async function syncCoins(){
   if(!sb||!sbUser) return;
@@ -1785,7 +1819,15 @@ const ACHS=[
   {id:'msg1',       ic:'💬', l:'Say Hi',         d:'Send a message',     t:s=>s.msgs>=1},
   {id:'comment1',   ic:'📝', l:'Commentator',    d:'Leave a comment',    t:s=>s.comments>=1},
   {id:'games10',    ic:'🎮', l:'Regular',        d:'Play 10 games',      t:s=>s.games>=10},
-  {id:'level5',     ic:'⭐', l:'Rising Star',     d:'Reach level 5',      t:s=>levelFromXp((account&&account.xp)||0).level>=5}
+  {id:'level5',     ic:'⭐', l:'Rising Star',     d:'Reach level 5',      t:s=>levelFromXp((account&&account.xp)||0).level>=5},
+  {id:'goals50',    ic:'🎯', l:'Sniper',          d:'Score 50 goals',     t:s=>s.goals>=50},
+  {id:'wins10',     ic:'🥇', l:'Champion',        d:'Win 10 matches',     t:s=>s.wins>=10},
+  {id:'wins50',     ic:'👑', l:'Legend',          d:'Win 50 matches',     t:s=>s.wins>=50},
+  {id:'games50',    ic:'🔥', l:'Grinder',         d:'Play 50 games',      t:s=>s.games>=50},
+  {id:'level10',    ic:'🌟', l:'Veteran',         d:'Reach level 10',     t:s=>levelFromXp((account&&account.xp)||0).level>=10},
+  {id:'streak3',    ic:'⚡', l:'On Fire',         d:'Win 3 in a row',     t:s=>(s.maxStreak||0)>=3},
+  {id:'keepaway1',  ic:'⏱️', l:'Ball Hog',        d:'Win a keep-away match', t:s=>(s.kaWins||0)>=1},
+  {id:'wager1',     ic:'💰', l:'High Roller',     d:'Win a $BASED wager', t:s=>(s.wagersWon||0)>=1}
 ];
 function checkAchievements(){
   const s=getStats(); const have=new Set(s.unlocked||[]); let changed=false;
@@ -1802,6 +1844,47 @@ function renderAchievements(){
     g.appendChild(d); });
 }
 
+// ---- standalone XP award (daily tasks etc.) ----
+function addXp(n){
+  if(!account||!n) return;
+  account.xp=(account.xp||0)+n;
+  const a=accounts(), me=a[account.username.toLowerCase()]; if(me){ me.xp=account.xp; saveAccts(a); }
+  if(sbUser) try{ sb.from('profiles').update({xp:account.xp}).eq('id',sbUser.id); }catch(_){}
+  refreshAcctBtn();
+}
+
+// ---- daily tasks (reset each calendar day; reward XP) ----
+const DAILY=[
+  {id:'play',  l:'Play 3 matches', goal:3, xp:30},
+  {id:'goals', l:'Score 5 goals',  goal:5, xp:40},
+  {id:'wins',  l:'Win 2 matches',  goal:2, xp:60}
+];
+function dayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function dailyStoreKey(){ return 'sh_daily_'+(account?account.username.toLowerCase():'guest'); }
+function getDaily(){
+  let o=DB.get(dailyStoreKey());
+  if(!o || o.date!==dayKey()){ o={date:dayKey(), play:0, goals:0, wins:0, claimed:[]}; DB.set(dailyStoreKey(),o); }
+  if(!o.claimed) o.claimed=[];
+  return o;
+}
+function bumpDaily(k,n){
+  if(!account) return;
+  const o=getDaily(); o[k]=(o[k]||0)+(n==null?1:n);
+  DAILY.forEach(t=>{ if((o[t.id]||0)>=t.goal && o.claimed.indexOf(t.id)<0){
+    o.claimed.push(t.id); addXp(t.xp); showToast('📋 Daily done — '+t.l+'  +'+t.xp+' XP','#ffd43b'); } });
+  DB.set(dailyStoreKey(),o); renderDaily();
+}
+function renderDaily(){
+  const list=$('dailyList'); if(!list) return;
+  const o=getDaily();
+  list.innerHTML = DAILY.map(t=>{ const v=Math.min(o[t.id]||0,t.goal), done=v>=t.goal, pct=Math.round(v/t.goal*100);
+    return '<div class="dtask'+(done?' done':'')+'"><div class="dtop"><span>'+t.l+' ('+v+'/'+t.goal+')</span><b>+'+t.xp+' XP</b></div>'+
+      '<div class="dbar"><i style="width:'+pct+'%"></i></div></div>'; }).join('');
+  const now=new Date(), end=new Date(now); end.setHours(24,0,0,0);
+  const ms=end-now, h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+  if($('dailyReset')) $('dailyReset').textContent='resets in '+h+'h '+m+'m';
+}
+
 // ---- award XP + stats at the end of a match ----
 function awardEndOfMatch(win){
   const myGoals = (netRole==='guest') ? (score.t||0) : (score.p||0);
@@ -1811,8 +1894,14 @@ function awardEndOfMatch(win){
     const a=accounts(), me=a[account.username.toLowerCase()]; if(me){ me.xp=account.xp; saveAccts(a); } }
   if(sbUser){ sb.from('profiles').update({xp:account?account.xp:0}).eq('id',sbUser.id); }
   // stats + achievements
-  const st=getStats(); st.games=(st.games||0)+1; st.goals=(st.goals||0)+myGoals; if(win)st.wins=(st.wins||0)+1; saveStats(st);
+  const st=getStats(); st.games=(st.games||0)+1; st.goals=(st.goals||0)+myGoals;
+  if(win){ st.wins=(st.wins||0)+1; st.streak=(st.streak||0)+1; if((st.streak||0)>(st.maxStreak||0)) st.maxStreak=st.streak;
+           if(gameMode==='keepaway') st.kaWins=(st.kaWins||0)+1; }
+  else st.streak=0;
+  saveStats(st);
   checkAchievements();
+  // daily tasks progress
+  bumpDaily('play'); if(myGoals>0) bumpDaily('goals',myGoals); if(win) bumpDaily('wins');
   const lv=levelFromXp(account?account.xp:0); const lvlUp=lv.level>beforeLvl;
   // render summary in the end screen
   const el=$('xpSummary'); el.classList.remove('hide');
@@ -1831,7 +1920,7 @@ function enterLobby(){
     .forEach(s=>$(s).classList.add('hide'));
   $('startScreen').classList.remove('hide');
   $('xBtn').classList.remove('hide');   // X link is available from the main menu onward, not on the intro
-  refreshAcctBtn();
+  refreshAcctBtn(); renderDaily(); syncRegionUI();
   startMusic('lobby');
   if(SOCIAL_ON()) ensureOnline().then(()=>{ startInbox(); });   // sign in for friends/chat/notifs
   if(pendingJoin) setTimeout(autoJoin, 300);   // arrived via an invite link
@@ -1925,7 +2014,7 @@ function openProfile(){
   $('profWins').textContent=a.wins||0; $('profLoss').textContent=a.losses||0;
   const tot=(a.wins||0)+(a.losses||0);
   $('profRate').textContent= tot? Math.round((a.wins||0)/tot*100)+'%' : '—';
-  $('profCoinsTop').textContent= account.guest ? '🪙 —' : ('🪙 '+(a.coins||0));
+  $('profCoinsTop').innerHTML= coinIcon()+(account.guest ? ' —' : (' '+(a.coins||0)));
   showProfTab('stats');
   $('profComments').innerHTML='<div class="empty">—</div>';
   (async()=>{ if(SOCIAL_ON()){ if(!sbUser) await ensureOnline(); if(sbUser){ loadComments(sbUser.id, $('profComments')); syncCoins(); } } })();
@@ -2190,7 +2279,7 @@ function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.re
 $('playBtn').onclick=openModeSelect;
 $('msBackBtn').onclick=()=>{ $('modeSelectScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
 $('msWagerBtn').onclick=()=>{                       // wager mode: pick a stake first, then character
-  if(!onlineWagerEnabled()){ showToast('Sign in with an account to wager $BASED 🪙','#ffd43b'); return; }
+  if(!onlineWagerEnabled()){ showToast('Sign in with an account to wager $BASED','#ffd43b'); return; }
   openWagerSelect(); };
 function openWagerSelect(){
   hideAllOverlays();
@@ -2201,7 +2290,7 @@ function openWagerSelect(){
 $('wsBackBtn').onclick=()=>{ $('wagerSelectScreen').classList.add('hide'); $('modeSelectScreen').classList.remove('hide'); };
 document.querySelectorAll('#wagerSelectScreen .wsAmt').forEach(b=>{
   b.onclick=()=>{ const amt=parseInt(b.getAttribute('data-amt'),10)||0;
-    if(amt>myCoins()){ $('wsErr').textContent='Not enough $BASED — you have 🪙'+myCoins()+'.'; return; }
+    if(amt>myCoins()){ $('wsErr').innerHTML='Not enough $BASED — you have '+coinIcon()+myCoins()+'.'; return; }
     stakeSel=amt;                                    // stake locked in; character select is next
     $('wagerSelectScreen').classList.add('hide');
     openSelect('wager'); }; });
@@ -2232,7 +2321,7 @@ seg('oppSeg','data-opp',v=>{ practiceOpp=v;
 seg('oppDiffSeg','data-diff',v=>diff=v);
 seg('stakeSeg','data-stake',v=>{ stakeSel=parseInt(v,10)||0;
   if($('stakeHint')) $('stakeHint').textContent = stakeSel
-    ? ('Stake '+stakeSel+' $BASED — winner takes '+(stakeSel*2)+'. You have 🪙'+myCoins()+'.')
+    ? ('Stake '+stakeSel+' $BASED — winner takes '+(stakeSel*2)+'. You have '+myCoins()+'.')
     : 'Friendly match — no $BASED at stake.'; });
 
 function openSelect(ctx){
@@ -2240,7 +2329,7 @@ function openSelect(ctx){
   hideAllOverlays();
   $('selectScreen').classList.remove('hide');
   $('oppOptions').style.display = ctx==='practice'?'block':'none';
-  $('selTitle').textContent = ctx==='wager' ? ('💰 WAGER 🪙'+stakeSel+' — PICK CHARACTER & MODE')
+  $('selTitle').innerHTML = ctx==='wager' ? ('💰 WAGER '+coinIcon()+stakeSel+' — PICK CHARACTER & MODE')
     : ctx==='quick' ? 'QUICK MATCH — PICK CHARACTER & MODE'
     : ctx==='host' ? 'YOUR LOBBY — CHOOSE CHARACTER (friend gets the other)'
     : 'PRACTICE — CHOOSE CHARACTER';
@@ -2285,7 +2374,7 @@ let wager={amount:0, oppId:null, matchId:null, settled:false};
 let onlineKind='friend';
 function resetWager(){ wager={amount:0, oppId:null, matchId:null, settled:false}; updatePotTag(); }
 function updatePotTag(){ const el=$('potTag'); if(!el) return;
-  if(wager.amount>0){ el.textContent='🪙 POT '+(wager.amount*2)+' $BASED'; el.classList.remove('hide'); }
+  if(wager.amount>0){ el.innerHTML=coinIcon()+' POT '+(wager.amount*2)+' $BASED'; el.classList.remove('hide'); }
   else el.classList.add('hide'); }
 function gpInit(){ gp = players? {x:players.t.x,y:players.t.y,vx:0,vy:0} : {x:W*0.73,y:H/2,vx:0,vy:0}; }
 function predictGuestSelf(){
@@ -2382,7 +2471,11 @@ function handleNet(m){
     else if(d.rematch){ onPeerRematch(); }              // friend tapped REMATCH
     else if(d.left){ peerLeft=true; greyRematch('Your friend went back to the menu.'); }
     else if(d.ping!=null){ NET.relay({pong:d.ping}); }   // bounce it back so the peer can measure RTT
-    else if(d.pong!=null){ NET.rtt=Math.round(performance.now()-d.pong); }
+    else if(d.pong!=null){ const rtt=Math.round(performance.now()-d.pong);
+      // smooth the ping reading, then size the interpolation buffers to it
+      NET.rtt = NET.rtt==null ? rtt : Math.round(NET.rtt*0.7 + rtt*0.3);
+      INTERP_DELAY = clamp(48 + NET.rtt*0.32, 60, 150);   // bigger cushion on higher-latency links
+      BALL_DELAY   = clamp(18 + NET.rtt*0.10, 20, 55); }
   }
 }
 // remember the last few real people you played online
@@ -2399,17 +2492,28 @@ function onPeerGone(msg){
   if(state==='play'){ setTimeout(()=>{ netRole=null; gotoMenu(); }, 1200); }
   netRole = netRole && state!=='play' ? null : netRole;
 }
-// region picker: choosing one fills the URL and saves it
-function applyRegionUI(){
-  const r=DB.get('sh_region')|| (DB.get('sh_lobby')===LOBBY_SERVERS.sin?'sin':'syd');
-  document.querySelectorAll('#regionSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-region')===r));
-  const saved=DB.get('sh_lobby');
-  // if the saved URL is one of our presets (or empty), keep it in sync with the chosen region
-  if(!saved || saved===LOBBY_SERVERS.syd || saved===LOBBY_SERVERS.sin) $('netUrl').value=LOBBY_SERVERS[r]||DEFAULT_LOBBY;
-  else $('netUrl').value=saved;   // a custom URL -> leave it
+// region picker (shared between the main-menu toggle and the lobby screen)
+function curRegion(){ return DB.get('sh_region') || (DB.get('sh_lobby')===LOBBY_SERVERS.sin?'sin':'syd'); }
+function syncRegionUI(){
+  const r=curRegion();
+  ['regionSeg','mainRegionSeg'].forEach(id=>document.querySelectorAll('#'+id+' button')
+    .forEach(b=>b.classList.toggle('on', b.getAttribute('data-region')===r)));
 }
-seg('regionSeg','data-region',r=>{ const url=LOBBY_SERVERS[r]||DEFAULT_LOBBY;
-  $('netUrl').value=url; DB.set('sh_lobby',url); DB.set('sh_region',r); });
+function setRegion(r){
+  const url=LOBBY_SERVERS[r]||DEFAULT_LOBBY;
+  DB.set('sh_lobby',url); DB.set('sh_region',r);
+  if($('netUrl')) $('netUrl').value=url;
+  syncRegionUI();
+  showToast((r==='sin'?'🇸🇬 Singapore':'🇦🇺 Sydney')+' server selected','#9bf6a8');
+}
+function applyRegionUI(){
+  const saved=DB.get('sh_lobby');
+  if(!saved || saved===LOBBY_SERVERS.syd || saved===LOBBY_SERVERS.sin) $('netUrl').value=LOBBY_SERVERS[curRegion()]||DEFAULT_LOBBY;
+  else $('netUrl').value=saved;   // a custom URL -> leave it
+  syncRegionUI();
+}
+seg('regionSeg','data-region',setRegion);
+seg('mainRegionSeg','data-region',setRegion);
 function openOnlineLobby(){ hideAllOverlays(); challengeTarget=null;
   $('onlineScreen').classList.remove('hide');
   applyRegionUI(); $('lobbyBox').classList.add('hide');
@@ -2499,12 +2603,13 @@ async function settleWager(win){
     }
     data=data||{};
     if(data.coins!=null) setLocalCoins(data.coins); else await syncCoins();
+    if(data.wager==='won') bumpStat('wagersWon');
     let line;
-    if(amt>0 && data.wager==='won')  line='<div class="xline"><span>🪙 Wager won</span><b style="color:#69db7c">+'+amt+' $BASED</b></div>';
-    else if(amt>0 && data.wager==='lost') line='<div class="xline"><span>🪙 Wager lost</span><b style="color:#ff8787">−'+amt+' $BASED</b></div>';
-    else if(amt>0 && data.status==='pending') line='<div class="xline"><span>🪙 Wager</span><b>opponent didn’t confirm — voided</b></div>';
-    else if(amt>0) line='<div class="xline"><span>🪙 Wager void</span><b>no coins moved</b></div>';
-    else line='<div class="xline"><span>🪙 $BASED</span><b>balance '+myCoins()+'</b></div>';
+    if(amt>0 && data.wager==='won')  line='<div class="xline"><span>'+coinIcon()+' Wager won</span><b style="color:#69db7c">+'+amt+' $BASED</b></div>';
+    else if(amt>0 && data.wager==='lost') line='<div class="xline"><span>'+coinIcon()+' Wager lost</span><b style="color:#ff8787">−'+amt+' $BASED</b></div>';
+    else if(amt>0 && data.status==='pending') line='<div class="xline"><span>'+coinIcon()+' Wager</span><b>opponent didn’t confirm — voided</b></div>';
+    else if(amt>0) line='<div class="xline"><span>'+coinIcon()+' Wager void</span><b>no coins moved</b></div>';
+    else line='<div class="xline"><span>'+coinIcon()+' $BASED</span><b>balance '+myCoins()+'</b></div>';
     append(line);
   }catch(e){ try{ await syncCoins(); }catch(_){ } }
 }
@@ -2518,7 +2623,7 @@ function _beginGameOnline(role){
   ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','onlineScreen','profileScreen','inboxScreen']
     .forEach(s=>$(s).classList.add('hide'));
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
-  $('hud').classList.remove('hide'); $('pCard').classList.remove('hide'); $('tCard').classList.remove('hide');
+  $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide'); $('pCard').classList.remove('hide'); $('tCard').classList.remove('hide');
   $('pauseBtn').textContent='❚❚'; $('touch').style.display='none';
   const oc=humanChar==='pepe'?'trumpe':'pepe';
   $('pCard').querySelector('.pc-name').textContent = role==='host' ? (account?account.username:STATS[humanChar].name) : (NET.peerName||STATS[humanChar].name);
@@ -2556,12 +2661,14 @@ function sendState(extra){
     s:[score.p,score.t], tl:timeLeft, gl:golden, pp:possP, tp:possT, gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0
   }});
 }
-// guest buffers snapshots and renders ~110ms in the past, gliding between them
-const INTERP_DELAY=68;     // opponent/own player smoothing buffer (tightened for low-latency Sydney link)
-const BALL_DELAY=22;       // render the ball nearly real-time so kicks feel responsive
+// guest buffers snapshots and renders in the past, gliding between them.
+// the buffer adapts to measured ping (tight on Sydney, larger on Singapore) so motion
+// stays smooth without stutter when packets arrive unevenly — see the pong handler.
+let INTERP_DELAY=68;       // opponent/own player smoothing buffer (adaptive 60–150ms)
+let BALL_DELAY=24;         // render the ball nearly real-time so kicks feel responsive (adaptive)
 function pushNetState(s){
   NET.buf.push({t:performance.now(), s});
-  if(NET.buf.length>24) NET.buf.shift();
+  if(NET.buf.length>40) NET.buf.shift();   // ~0.8s of history at 50Hz — room for the adaptive buffer
   NET.state=s;
 }
 function nlerp(a,b,k){ return a+(b-a)*k; }
@@ -2632,6 +2739,24 @@ async function ensureOnline(){
   startPresence();
   syncCoins();          // pull authoritative $BASED balance (new profiles default to 1000)
   return true;
+}
+// ---- live "playing now" counter: every open tab joins a shared presence channel ----
+let tabChan=null, liveCount=0;
+function updateLiveCount(){
+  const n=Math.max(1, liveCount||0);
+  const m=$('liveCountMenu'); if(m) m.innerHTML='👁 <b>'+n+'</b> playing now';
+  const h=$('liveCountHud');  if(h) h.textContent='👁 '+n;
+}
+function startTabPresence(){
+  if(!sb || tabChan) return;
+  try{
+    const key='tab_'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+    tabChan=sb.channel('live_tabs', {config:{presence:{key}}});
+    tabChan.on('presence',{event:'sync'},()=>{
+      liveCount=Object.keys(tabChan.presenceState()).length; updateLiveCount(); });
+    tabChan.subscribe(s=>{ if(s==='SUBSCRIBED') tabChan.track({t:Date.now()}); });
+  }catch(e){}
+  updateLiveCount();
 }
 function startPresence(){
   if(presence||!sbUser) return;
@@ -2834,7 +2959,7 @@ function showLoadingThen(fn){
   const pe=$('loadPepe'); if(pe && !pe.getAttribute('src')) pe.src=PEPE_SRC;   // spin Pepe
   ov.classList.remove('hide');
   clearTimeout(_loadTimer);
-  _loadTimer=setTimeout(()=>{ ov.classList.add('hide'); fn&&fn(); }, 5000);
+  _loadTimer=setTimeout(()=>{ ov.classList.add('hide'); fn&&fn(); }, 3500);
 }
 function showMatchBanner(){
   const b=$('matchBanner'); if(!b) return;
@@ -2856,7 +2981,7 @@ function _beginGame(){
   ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','profileScreen','inboxScreen']
     .forEach(s=>$(s).classList.add('hide'));
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
-  $('hud').classList.remove('hide');
+  $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide');
   $('pCard').classList.remove('hide');
   $('tCard').classList.toggle('hide', !oppActive);
   $('pauseBtn').textContent='❚❚';
@@ -2883,7 +3008,7 @@ function gotoMenu(){
   clearTimeout(_bannerTimer); $('matchBanner').classList.add('hide');
   clearTimeout(_loadTimer); $('loadingScreen').classList.add('hide');
   hideAllOverlays();
-  ['hud','pCard','tCard'].forEach(s=>$(s).classList.add('hide'));
+  ['hud','pCard','tCard','liveCountHud'].forEach(s=>$(s).classList.add('hide'));
   ranked=false; state='menu';
   $('startScreen').classList.remove('hide');
   const pt=$('pingTag'); if(pt)pt.classList.add('hide'); NET.rtt=null;
@@ -2909,7 +3034,8 @@ function onPeerRematch(){ if(peerLeft) return; rematchPeer=true;
   if(rematchMe) doRematchStart(); }
 function clickRematch(){
   if($('rematchBtn').classList.contains('disabled')) return;
-  if(!netRole){ $('winScreen').classList.add('hide'); newGame(); lastTs=performance.now(); state='play'; return; }
+  if(!netRole){ $('winScreen').classList.add('hide');
+    showLoadingThen(()=>{ newGame(); lastTs=performance.now(); state='play'; showMatchBanner(); }); return; }
   if(peerLeft) return;
   rematchMe=true; $('rematchMsg').textContent = rematchPeer ? 'Starting…' : 'Waiting for your friend…';
   NET.relay({rematch:true});
@@ -2918,8 +3044,8 @@ function clickRematch(){
 function doRematchStart(){
   if(netRole==='host'){
     $('winScreen').classList.add('hide');
-    newGame(); lastTs=performance.now(); state='play';
-    sendHostStart();
+    sendHostStart();                  // guest gets d.start -> runs its own 3.5s loader via beginGameOnline
+    showLoadingThen(()=>{ newGame(); lastTs=performance.now(); state='play'; showMatchBanner(); });
     rematchMe=false; rematchPeer=false;
   } else { $('rematchMsg').textContent='Starting…'; }   // guest waits for host's fresh start packet
 }
@@ -2934,12 +3060,14 @@ $('winAddFriend').onclick=async ()=>{
 
 // character preview images on the select screen
 $('imgPepe').src=PEPE_SRC; $('imgTrumpe').src=TRUMPE_SRC;
+{ const lp=$('loadPepe'); if(lp) lp.src=PEPE_SRC; }   // preload the spinning loader sprite
 
 resize(); reset();
 // one-time migration: anyone who saved the old Render lobby gets moved to Sydney
 (function(){ const l=DB.get('sh_lobby'); if(l && /onrender\.com/i.test(l)){ DB.set('sh_lobby', DEFAULT_LOBBY); DB.set('sh_region','syd'); } })();
 $('startGameBtn').onclick=()=>{ audioInit(); startMusic('theme'); $('splashScreen').classList.add('hide'); showLoadingThen(showAuth); };
 let ready=0; [imgP,imgT].forEach(im=>im.onload=()=>{ready++;});
+startTabPresence();      // live "playing now" counter (every open tab)
 requestAnimationFrame(loop);
 </script>
 </body>

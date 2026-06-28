@@ -295,6 +295,26 @@
     z-index:15;font-size:min(13vw,90px);font-weight:900;letter-spacing:4px;
     color:#fff;text-shadow:0 4px 0 #000,0 0 30px rgba(255,212,59,.8);
     pointer-events:none;opacity:0}
+  /* loading screen ("Bringing Goy into the system") */
+  #loadingScreen{position:absolute;inset:0;z-index:200;background:#000;
+    display:flex;align-items:center;justify-content:center}
+  #loadText{color:#e9fff0;font-weight:800;font-size:clamp(16px,3.4vw,26px);letter-spacing:1px;
+    text-align:center;text-shadow:0 0 24px rgba(105,219,124,.45);padding:0 18px}
+  #loadText .dots{color:#69db7c}
+  #loadPepe{position:absolute;right:26px;bottom:26px;width:74px;height:74px;object-fit:contain;
+    transform-origin:50% 50%;animation:spin 1s linear infinite;filter:drop-shadow(0 0 12px rgba(105,219,124,.5))}
+  /* mode-entry banner (small framed card, centre screen) */
+  #matchBanner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:120;
+    pointer-events:none;min-width:min(78vw,320px);text-align:center;
+    background:linear-gradient(180deg,rgba(9,24,15,.96),rgba(5,15,9,.96));
+    border:2px solid #69db7c;border-radius:16px;padding:16px 22px;
+    box-shadow:0 12px 40px rgba(0,0,0,.6),0 0 26px rgba(105,219,124,.25);
+    animation:bannerIn .35s ease-out}
+  #mbMode{font-size:22px;font-weight:900;letter-spacing:1px;color:#e9fff0}
+  #mbVs{font-size:15px;color:#9bf6a8;margin-top:4px}
+  #mbWager{font-size:15px;font-weight:800;color:#ffd43b;margin-top:6px}
+  #mbWager:empty{display:none}
+  @keyframes bannerIn{from{opacity:0;transform:translate(-50%,-46%) scale(.92)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 </style>
 </head>
 <body>
@@ -310,7 +330,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b25 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b26 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.35);padding:3px 10px;border-radius:8px"></div>
   <div id="pingTag" class="hide" style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-size:11px;color:rgba(180,255,200,.7);z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.3);padding:2px 8px;border-radius:8px"></div>
 
@@ -339,6 +359,19 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- mode-entry banner (mode / opponent / wager) -->
+  <div id="matchBanner" class="hide">
+    <div id="mbMode">⚽ GOALS</div>
+    <div id="mbVs">vs CPU</div>
+    <div id="mbWager"></div>
+  </div>
+
+  <!-- loading screen ("Bringing Goy into the system") -->
+  <div id="loadingScreen" class="hide">
+    <div id="loadText">Bringing Goy into the system<span class="dots">…</span></div>
+    <img id="loadPepe" alt="">
+  </div>
 
   <!-- PUBLIC PROFILE (another player) -->
   <div class="overlay hide" id="pubProfileScreen">
@@ -513,6 +546,20 @@
       <div class="row"><button class="btn" id="msFriendBtn" style="width:100%">🎮 PLAY A FRIEND</button></div>
       <div class="muted">private lobby by code or invite link</div>
       <div class="row" style="margin-top:10px"><button class="btn ghost" id="msBackBtn">BACK</button></div>
+    </div>
+  </div>
+
+  <!-- WAGER AMOUNT (choose stake before character select) -->
+  <div class="overlay hide" id="wagerSelectScreen">
+    <div class="card">
+      <div class="formTitle">💰 WAGER MODE</div>
+      <div class="sub" style="margin-bottom:6px">Choose your stake — winner takes the pot.</div>
+      <div class="muted" style="margin-bottom:10px">You have 🪙<b id="wsBal" style="color:#ffd43b">0</b> $BASED</div>
+      <div class="row"><button class="btn big-btn wsAmt" data-amt="50">🪙 50</button></div>
+      <div class="row"><button class="btn wsAmt" data-amt="100" style="width:100%">🪙 100</button></div>
+      <div class="row"><button class="btn wsAmt" data-amt="250" style="width:100%">🪙 250</button></div>
+      <div class="err" id="wsErr"></div>
+      <div class="row" style="margin-top:10px"><button class="btn ghost" id="wsBackBtn">BACK</button></div>
     </div>
   </div>
 
@@ -750,7 +797,9 @@ function statDerived(c){ const s=STATS[c]; return {
 const imgFor=c=> c==='pepe'?imgP:imgT;
 const BALL_R=13;
 const SPRINT_MULT=1.55;
-const MATCH_TIME=60;              // 1:00 countdown
+const MATCH_TIME=60;              // 1:00 per half (goals)
+const KEEPAWAY_TIME=90;          // keep-away is a single 1:30 period (no half-time)
+function matchLen(){ return gameMode==='keepaway' ? KEEPAWAY_TIME : MATCH_TIME; }
 
 let dpr=1;
 function resize(){
@@ -787,11 +836,11 @@ function reset(concededBy){
   else if(concededBy==='p'){ ball.x=W*0.36; ball.vx=-1.2; }
   kickFlash=0; kickoffLock=55;
 }
-function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; timeLeft=MATCH_TIME; golden=false;
+function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; timeLeft=matchLen(); golden=false;
   clearTimeout(htTimer); hideHalftime();
-  setMeta(halfLabel()); updateHUD(); reset(); goalLock=0;
-  if(gameMode==='keepaway') showToast('KEEP-AWAY — hold the ball longest!','#ffd43b');}
-function halfLabel(){ const h=half===2?'2ND HALF':'1ST HALF'; return gameMode==='keepaway'?(h+' · HOLD IT'):h; }
+  setMeta(halfLabel()); updateHUD(); reset(); goalLock=0;}
+function halfLabel(){ if(gameMode==='keepaway') return 'KEEP-AWAY · HOLD IT';
+  return half===2?'2ND HALF':'1ST HALF'; }
 
 function fmtTime(t){const m=Math.max(0,Math.floor(t/60)), s=Math.max(0,Math.floor(t%60));
   return m+':'+String(s).padStart(2,'0');}
@@ -802,8 +851,13 @@ function setStam(id,pl){const el=document.getElementById(id); if(!el||!pl)return
   el.classList.toggle('low', !pl.sprinting && pl.stamina<0.25);}
 function updateHUD(){
   if(gameMode==='keepaway'){
-    document.getElementById('pScore').textContent=Math.floor(possP);
-    document.getElementById('tScore').textContent=Math.floor(possT);
+    document.getElementById('pScore').textContent=Math.floor(possP)+'s';
+    document.getElementById('tScore').textContent=Math.floor(possT)+'s';
+    if(players && !halftime){            // live "who's winning" readout
+      const dp=possP-possT;
+      setMeta('⏱️ '+(Math.abs(dp)<0.5 ? 'EVEN — grab the ball!'
+        : (dp>0?STATS[players.p.char].name:STATS[players.t.char].name)+' AHEAD'));
+    }
   } else {
     document.getElementById('pScore').textContent=score.p;
     document.getElementById('tScore').textContent=score.t;
@@ -1251,18 +1305,19 @@ function showHalftime(){
 }
 function hideHalftime(){ const ov=$('halftimeScreen'); if(ov) ov.classList.add('hide'); clearInterval(htCountTimer); }
 function onTimeUp(){
-  if(half===1){                       // first half done -> 5s frozen half-time, then resume in place
+  if(gameMode==='keepaway'){ endGame(possP>=possT?'p':'t'); return; }   // single 1:30 period, no half-time
+  if(half===1){                       // first half done -> 5s frozen half-time, then 2nd-half kickoff
     halftime=true; timeLeft=0; updateHUD();
     setMeta('HALF TIME'); showHalftime();
     // the loop keeps streaming snapshots with ht=1 so the guest freezes + shows the screen too
     clearTimeout(htTimer);
     htTimer=setTimeout(()=>{
-      half=2; halftime=false; timeLeft=MATCH_TIME;   // pick up the 2nd half from the frozen positions
+      half=2; halftime=false; timeLeft=MATCH_TIME;
+      reset();                        // 2nd half: ball back to centre, players to their starting spots
       setMeta(halfLabel()); updateHUD(); hideHalftime();
     }, 5000);
     return;
   }
-  if(gameMode==='keepaway'){ endGame(possP>=possT?'p':'t'); return; }
   if(score.p===score.t){ golden=true; setMeta('GOLDEN GOAL'); showToast('GOLDEN GOAL','#ffd43b'); updateHUD(); }
   else endGame(score.p>score.t?'p':'t');
 }
@@ -2134,9 +2189,22 @@ function cancelMatch(){ quickMode=false; clearInterval(matchTimer); clearTimeout
 function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.remove('hide'); }
 $('playBtn').onclick=openModeSelect;
 $('msBackBtn').onclick=()=>{ $('modeSelectScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
-$('msWagerBtn').onclick=()=>{                       // matchmake WITH a $BASED stake
+$('msWagerBtn').onclick=()=>{                       // wager mode: pick a stake first, then character
   if(!onlineWagerEnabled()){ showToast('Sign in with an account to wager $BASED 🪙','#ffd43b'); return; }
-  openSelect('wager'); };
+  openWagerSelect(); };
+function openWagerSelect(){
+  hideAllOverlays();
+  if(!sbUser) ensureOnline();                       // make sure our online id is ready before queuing
+  $('wsBal').textContent=myCoins(); $('wsErr').textContent='';
+  $('wagerSelectScreen').classList.remove('hide');
+}
+$('wsBackBtn').onclick=()=>{ $('wagerSelectScreen').classList.add('hide'); $('modeSelectScreen').classList.remove('hide'); };
+document.querySelectorAll('#wagerSelectScreen .wsAmt').forEach(b=>{
+  b.onclick=()=>{ const amt=parseInt(b.getAttribute('data-amt'),10)||0;
+    if(amt>myCoins()){ $('wsErr').textContent='Not enough $BASED — you have 🪙'+myCoins()+'.'; return; }
+    stakeSel=amt;                                    // stake locked in; character select is next
+    $('wagerSelectScreen').classList.add('hide');
+    openSelect('wager'); }; });
 $('msQuickBtn').onclick=()=>openSelect('quick');   // matchmake, friendly (no wager)
 $('msFriendBtn').onclick=()=>openOnlineLobby();    // private friend lobby (no wager)
 
@@ -2172,7 +2240,7 @@ function openSelect(ctx){
   hideAllOverlays();
   $('selectScreen').classList.remove('hide');
   $('oppOptions').style.display = ctx==='practice'?'block':'none';
-  $('selTitle').textContent = ctx==='wager' ? '💰 WAGER MODE — PICK CHARACTER, MODE & STAKE'
+  $('selTitle').textContent = ctx==='wager' ? ('💰 WAGER 🪙'+stakeSel+' — PICK CHARACTER & MODE')
     : ctx==='quick' ? 'QUICK MATCH — PICK CHARACTER & MODE'
     : ctx==='host' ? 'YOUR LOBBY — CHOOSE CHARACTER (friend gets the other)'
     : 'PRACTICE — CHOOSE CHARACTER';
@@ -2181,17 +2249,14 @@ function openSelect(ctx){
   document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-mode')==='goals'));
   if($('modeHint')) $('modeHint').textContent='First to most goals in 60s.';
   $('oppDiffRow').style.display = practiceOpp==='cpu'?'flex':'none';
-  // wager selector lives ONLY in Wager Mode (quick & friend stay strictly no-wager)
-  stakeSel=0;
-  document.querySelectorAll('#stakeSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-stake')==='0'));
-  const wagerOk = ctx==='wager' && onlineWagerEnabled();
-  $('stakeRow').style.display = wagerOk ? 'block' : 'none';
-  if(wagerOk && $('stakeHint')) $('stakeHint').textContent='Pick a stake — or stay friendly. You have 🪙'+myCoins()+'.';
-  if(wagerOk && !sbUser) ensureOnline();   // make sure our online id is ready before kickoff
+  // the stake is chosen on its own screen (Wager Mode) — never an inline option here.
+  if(ctx!=='wager') stakeSel=0;
+  if($('stakeRow')) $('stakeRow').style.display='none';
+  if(ctx==='wager' && !sbUser) ensureOnline();   // make sure our online id is ready before queuing
 }
 $('selBackBtn').onclick=()=>{ $('selectScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
 seg('modeSeg','data-mode', m=>{ gameMode=m;
-  if($('modeHint')) $('modeHint').textContent = m==='keepaway' ? 'Whoever holds the ball longest in 60s wins.' : 'First to most goals in 60s.'; });
+  if($('modeHint')) $('modeHint').textContent = m==='keepaway' ? 'Hold the ball longest in one 1:30 round — no half-time.' : 'First to most goals over two 1:00 halves.'; });
 $('selStartBtn').onclick=()=>{
   humanChar=selChar;
   if(csContext==='host'){                       // online host picked character -> start the match
@@ -2444,7 +2509,8 @@ async function settleWager(win){
   }catch(e){ try{ await syncCoins(); }catch(_){ } }
 }
 
-function beginGameOnline(role){
+function beginGameOnline(role){ showLoadingThen(()=>_beginGameOnline(role)); }   // 5s loading, then start
+function _beginGameOnline(role){
   netRole=role; oppActive=true; ranked=true; mode='online';
   netKickPrev=false; NET.state=null; NET.buf=[]; stateSendAcc=0; gInputAcc=0;
   NET.guestInput={ax:0,ay:0,aim:Math.PI,sprint:false,kick:false};
@@ -2459,6 +2525,7 @@ function beginGameOnline(role){
   $('tCard').querySelector('.pc-name').textContent = role==='guest' ? (account?account.username:STATS[oc].name) : (NET.peerName||STATS[oc].name);
   $('pTeam').textContent=STATS[humanChar].abbr; $('tTeam').textContent=STATS[oc].abbr;
   newGame(); gpInit(); lastTs=performance.now(); state='play'; audioInit(); stopMusic();
+  showMatchBanner();
 }
 // host applies the guest's streamed input to the right-side player
 function controlNet(pl){
@@ -2759,7 +2826,33 @@ $('boardBtn').onclick=openBoard;
 $('boardBackBtn').onclick=()=>{ $('boardScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
 
 // ---- game flow ----
-function beginGame(){
+// ---- loading screen ("Bringing Goy into the system") + mode-entry banner ----
+let _loadTimer=null, _bannerTimer=null;
+function showLoadingThen(fn){
+  const ov=$('loadingScreen');
+  if(!ov){ fn&&fn(); return; }
+  const pe=$('loadPepe'); if(pe && !pe.getAttribute('src')) pe.src=PEPE_SRC;   // spin Pepe
+  ov.classList.remove('hide');
+  clearTimeout(_loadTimer);
+  _loadTimer=setTimeout(()=>{ ov.classList.add('hide'); fn&&fn(); }, 5000);
+}
+function showMatchBanner(){
+  const b=$('matchBanner'); if(!b) return;
+  $('mbMode').textContent = gameMode==='keepaway' ? '⏱️ KEEP-AWAY' : '⚽ GOALS';
+  let vs;
+  if(netRole) vs = 'vs '+(NET.peerName||'opponent');
+  else if(mode==='2p') vs = '2 PLAYERS · local';
+  else if(!oppActive) vs = 'SOLO practice';
+  else vs = 'vs CPU';
+  $('mbVs').textContent = vs;
+  $('mbWager').textContent = (wager && wager.amount>0) ? ('💰 Wagering '+wager.amount+' $BASED') : '';
+  b.classList.remove('hide');
+  clearTimeout(_bannerTimer);
+  _bannerTimer=setTimeout(()=>b.classList.add('hide'), 3200);
+}
+
+function beginGame(){ showLoadingThen(_beginGame); }       // 5s loading screen, then start
+function _beginGame(){
   ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','profileScreen','inboxScreen']
     .forEach(s=>$(s).classList.add('hide'));
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
@@ -2774,6 +2867,7 @@ function beginGame(){
   $('pTeam').textContent = STATS[humanChar].abbr;
   $('tTeam').textContent = ranked? 'CPU' : STATS[oc].abbr;
   newGame(); lastTs=performance.now(); state='play'; audioInit(); stopMusic();
+  showMatchBanner();
 }
 function togglePause(){
   if(netRole) return;   // can't pause a live online match
@@ -2786,6 +2880,8 @@ function gotoMenu(){
   if(netRole && NET.ws){ NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
   netRole=null; gp=null; resetWager();
   clearTimeout(htTimer); hideHalftime(); halftime=false;
+  clearTimeout(_bannerTimer); $('matchBanner').classList.add('hide');
+  clearTimeout(_loadTimer); $('loadingScreen').classList.add('hide');
   hideAllOverlays();
   ['hud','pCard','tCard'].forEach(s=>$(s).classList.add('hide'));
   ranked=false; state='menu';
@@ -2842,7 +2938,7 @@ $('imgPepe').src=PEPE_SRC; $('imgTrumpe').src=TRUMPE_SRC;
 resize(); reset();
 // one-time migration: anyone who saved the old Render lobby gets moved to Sydney
 (function(){ const l=DB.get('sh_lobby'); if(l && /onrender\.com/i.test(l)){ DB.set('sh_lobby', DEFAULT_LOBBY); DB.set('sh_region','syd'); } })();
-$('startGameBtn').onclick=()=>{ audioInit(); startMusic('theme'); $('splashScreen').classList.add('hide'); showAuth(); };
+$('startGameBtn').onclick=()=>{ audioInit(); startMusic('theme'); $('splashScreen').classList.add('hide'); showLoadingThen(showAuth); };
 let ready=0; [imgP,imgT].forEach(im=>im.onload=()=>{ready++;});
 requestAnimationFrame(loop);
 </script>

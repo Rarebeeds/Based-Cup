@@ -10,10 +10,10 @@ Read **CLAUDE.md** first (laws/build/deploy). Deep internals are in **PROJECT_BR
 >
 > Then confirm the badge is bumped and `index.html` is built/validated. (Rules/gotchas change → update CLAUDE.md instead.)
 
-## Current build: **b51** (badge in `game_template.html`, search `based-cup bNN ✓`)
-Last verified: 14 characters load, START flow works, 0 errors, 0 leftover tokens, 0 placeholder sprites.
-✅ **b51 DEPLOYED** — pushed to `origin/main` (commit `141b444`), Vercel auto-deploys from `main`. (Previous live build was b46.)
-This folder is now the git checkout (branch `main` tracking `origin/main`); deploy = `git push origin main`. Repo's `api/`, `package.json`, `supabase-schema.sql`, `README.md` are merged in alongside the working source.
+## Current build: **b52** (badge in `game_template.html`, search `based-cup bNN ✓`)
+Last verified: all 14 sprites load in-browser at 360×450, START flow works, 0 errors, 0 leftover tokens, 0 placeholder sprites.
+✅ **b52 DEPLOYED** — forced clean redeploy (cache/propagation flush). The reported "sprites disappeared" bug was **NOT a build defect** — all 3 known causes ruled out (files on disk intact, 0 tokens, 0 TINY placeholders, THRESH3=110) and a real-browser check confirmed all 14 `IMG` load at 360×450. Most likely the user saw stale cache / the pre-b51 live build (b46). b52 bumps the badge so the live build can be confirmed.
+This folder is the git checkout (branch `main` tracking `origin/main`); deploy = `git push origin main`. Repo's `api/`, `package.json`, `supabase-schema.sql`, `README.md` coexist with the working source.
 
 ---
 
@@ -82,6 +82,7 @@ Art source library: `OneDrive\Desktop\SOCC\CHARACTERS` (and the `C` subfolder = 
 ---
 
 ## Log
+- b52: **"sprites disappeared" bug report — root-caused as NOT a build defect.** Diagnosed the 3 known causes in order: (1) all 14 `_cut`/`_cut_s.png` present + non-zero on disk (no OneDrive churn), (2) deployed `index.html` had 0 leftover tokens AND 0 `TINY` placeholders, all 14 `*_SRC` constants filled with real base64 PNGs, (3) `THRESH3=110` (correct). Runtime check in a real browser: all 14 `IMG` objects load at 360×450, `blankOrFailed:[]`, title scene renders a sprite. Conclusion: the b51 artifact renders all sprites — the live symptom is environmental (stale cache / b51 deploy not propagated; live was b46 before the recent push). Action: bumped badge → b52, clean rebuild + full ship gate, pushed to force a fresh Vercel deploy so the live build is confirmable. ⚠️ If the live badge still shows b46/blank after hard-refresh, the issue is the Vercel project's production-branch wiring, not the code. No code/sprite change was needed.
 - b51 (deploy): **git wiring + first git-push deploy.** Made the working folder a real git checkout on `main` tracking `origin/main`; merged the deployed repo assets (`api/`, `package.json`, `supabase-schema.sql`, `README.md`) with the full local source via an unrelated-histories merge (only overlap was `index.html` — kept the validated b51, origin's old b46 stays in history). Pushed → `origin/main` `141b444`; Vercel auto-deploys from `main`. Deploy is now `git push` (was: manual upload) — CLAUDE.md updated. NOTE: the ~25 MB binary push takes >2 min — push in the background, don't kill on a foreground timeout. Next: TURN server or 2v2 when the user picks.
 - b51 (docs): **docs consolidation** — three live docs (CLAUDE = laws, STATE = state, PROJECT_BRIEF = deep reference); archived the stale b24 deep briefing to `archive/HANDOFF.b24-snapshot.md` (its still-current infra/gotchas migrated into PROJECT_BRIEF §12–13); CLAUDE trimmed to 1 page of laws/guards/commands; STATE got this pinned end-of-session rule + status board. No game code changed (badge bump only).
 - b50: crash-proof guard on `EXTRA_CHARS` (un-built file can't dead-screen) + root-caused the "won't start" bug = user was deploying `game_template.html` not `index.html`.

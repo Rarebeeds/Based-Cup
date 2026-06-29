@@ -201,11 +201,12 @@ function updateHUD(){
 const keys={};
 addEventListener('keydown',e=>{
   if(e.target && e.target.tagName==='INPUT') return;   // let form fields work normally
+  if(typeof e.key!=='string') return;   // synthetic events (browser autofill / extensions e.g. Phantom) fire with key/code undefined -> e.key.toLowerCase() threw (b53)
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
-  keys[e.key.toLowerCase()]=true; keys[e.code.toLowerCase()]=true;
+  keys[e.key.toLowerCase()]=true; if(typeof e.code==='string') keys[e.code.toLowerCase()]=true;
   if(e.key.toLowerCase()==='p' || e.key==='Escape'){ if(state==='play'||state==='paused') togglePause(); }
 });
-addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false; keys[e.code.toLowerCase()]=false;});
+addEventListener('keyup',e=>{ if(typeof e.key!=='string') return; keys[e.key.toLowerCase()]=false; if(typeof e.code==='string') keys[e.code.toLowerCase()]=false;});
 
 // mouse: aim toward cursor, left-click kicks
 const mouse={x:W/2,y:H/2,active:false};

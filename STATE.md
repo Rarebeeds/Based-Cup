@@ -10,10 +10,10 @@ Read **CLAUDE.md** first (laws/build/deploy). Deep internals are in **PROJECT_BR
 >
 > Then confirm the badge is bumped and `index.html` is built/validated. (Rules/gotchas change → update CLAUDE.md instead.)
 
-## Current build: **b52** (badge in `game_template.html`, search `based-cup bNN ✓`)
-Last verified: all 14 sprites load in-browser at 360×450, START flow works, 0 errors, 0 leftover tokens, 0 placeholder sprites.
-✅ **b52 DEPLOYED** — forced clean redeploy (cache/propagation flush). The reported "sprites disappeared" bug was **NOT a build defect** — all 3 known causes ruled out (files on disk intact, 0 tokens, 0 TINY placeholders, THRESH3=110) and a real-browser check confirmed all 14 `IMG` load at 360×450. Most likely the user saw stale cache / the pre-b51 live build (b46). b52 bumps the badge so the live build can be confirmed.
-This folder is the git checkout (branch `main` tracking `origin/main`); deploy = `git push origin main`. Repo's `api/`, `package.json`, `supabase-schema.sql`, `README.md` coexist with the working source.
+## Current build: **b53** (badge in `game_template.html`, search `based-cup bNN ✓`)
+Last verified: line-1094 TypeError fixed + reproduced-then-gone in-browser; `drawPlayer` renders all chars in-match (pixel-proven); 0 errors, 0 leftover tokens, 0 placeholder sprites, harness passes.
+✅ **b53 = real fix** for the live `Cannot read properties of undefined (reading 'toLowerCase')` @1094 throw. The keydown/keyup input handlers called `e.key.toLowerCase()`/`e.code.toLowerCase()` with no guard; **synthetic key events from browser autofill / extensions (Phantom wallet, password managers) fire with `key`/`code` undefined** → threw mid-match. Fixed with a `typeof e.key!=='string'` guard (b46/b52 were sprite-file/cache red herrings — the actual bug was code, in the input path, NOT drawPlayer).
+This folder is the git checkout (branch `main` tracking `origin/main`); deploy = `git push origin main`.
 
 ---
 
@@ -38,6 +38,7 @@ This folder is the git checkout (branch `main` tracking `origin/main`); deploy =
 | Mobile controls + overlay scroll + rotate nudge | ✅ done | b41/b42 |
 | One-time intro (terminal → curtain → reveal) | ✅ done | b44/b45 |
 | On-screen error reporter (red bar + 📋 COPY) | ✅ done | b48/b49 |
+| Input handlers robust to synthetic key events (autofill/extensions) | ✅ done | b53 |
 | Crash-proof `EXTRA_CHARS` guard (un-built can't dead-screen) | ✅ done | b50 |
 | **TURN server** (P2P through CGNAT/mobile NATs) | 🔜 next — biggest latency win | — |
 | **4-player (2v2)** in one match | 🔜 next — multi-phase, not started | — |
@@ -82,6 +83,7 @@ Art source library: `OneDrive\Desktop\SOCC\CHARACTERS` (and the `C` subfolder = 
 ---
 
 ## Log
+- b53: **fixed the live `toLowerCase` of undefined @1094 TypeError (real CODE bug).** Mapped built `index.html`:1094 → template:1094 (1:1, both 3571 lines): the global `keyup` handler `keys[e.key.toLowerCase()]=false; keys[e.code.toLowerCase()]=false;` (and keydown @1091/1092). Root cause: real `KeyboardEvent`s always carry `key`/`code`, but **synthetic key events from browser autofill + extensions (Phantom wallet, password managers) arrive as generic events with `key`/`code` undefined** → `.toLowerCase()` threw, firing 2× (keydown+keyup) and at arbitrary times incl. mid-match. REPRODUCED in-browser (`dispatchEvent(new Event('keyup'))` → exact `@line:1094` throw), then confirmed GONE after the fix (synthetic events now fire 0 errors; real KeyboardEvents still work). Fix: guard `if(typeof e.key!=='string') return;` on both handlers + guard `e.code` independently (missing values are legitimately possible, so defensive guard is correct). Separately pixel-proved `drawPlayer` renders all chars in-match (pepe/chad/soyjak/wojak each draw 2.8k–4.1k head pixels) — the "blank in-match" was the earlier b46 cache, not a render bug. Harness passed while this shipped (it doesn't dispatch synthetic key events) — that's why prior sprite-file/cache audits missed it.
 - b52: **"sprites disappeared" bug report — root-caused as NOT a build defect.** Diagnosed the 3 known causes in order: (1) all 14 `_cut`/`_cut_s.png` present + non-zero on disk (no OneDrive churn), (2) deployed `index.html` had 0 leftover tokens AND 0 `TINY` placeholders, all 14 `*_SRC` constants filled with real base64 PNGs, (3) `THRESH3=110` (correct). Runtime check in a real browser: all 14 `IMG` objects load at 360×450, `blankOrFailed:[]`, title scene renders a sprite. Conclusion: the b51 artifact renders all sprites — the live symptom is environmental (stale cache / b51 deploy not propagated; live was b46 before the recent push). Action: bumped badge → b52, clean rebuild + full ship gate, pushed to force a fresh Vercel deploy so the live build is confirmable. ⚠️ If the live badge still shows b46/blank after hard-refresh, the issue is the Vercel project's production-branch wiring, not the code. No code/sprite change was needed.
 - b51 (deploy): **git wiring + first git-push deploy.** Made the working folder a real git checkout on `main` tracking `origin/main`; merged the deployed repo assets (`api/`, `package.json`, `supabase-schema.sql`, `README.md`) with the full local source via an unrelated-histories merge (only overlap was `index.html` — kept the validated b51, origin's old b46 stays in history). Pushed → `origin/main` `141b444`; Vercel auto-deploys from `main`. Deploy is now `git push` (was: manual upload) — CLAUDE.md updated. NOTE: the ~25 MB binary push takes >2 min — push in the background, don't kill on a foreground timeout. Next: TURN server or 2v2 when the user picks.
 - b51 (docs): **docs consolidation** — three live docs (CLAUDE = laws, STATE = state, PROJECT_BRIEF = deep reference); archived the stale b24 deep briefing to `archive/HANDOFF.b24-snapshot.md` (its still-current infra/gotchas migrated into PROJECT_BRIEF §12–13); CLAUDE trimmed to 1 page of laws/guards/commands; STATE got this pinned end-of-session rule + status board. No game code changed (badge bump only).

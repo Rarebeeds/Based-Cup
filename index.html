@@ -432,7 +432,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b53 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b54 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1378,35 +1378,61 @@ function tryKick(pl, chargeAmt){
 
 // ---- AI for Trumpe (roams the whole pitch) ----
 function aiControl(pl){
-  setAim(pl);
-  const D={easy:{spd:.72,err:48,kick:.5},
-           normal:{spd:.9,err:26,kick:.75},
-           hard:{spd:1.0,err:10,kick:.95}}[diff];
+  // Difficulty tiers escalate on FIVE axes, not one: reaction time, shot aim+accuracy, corner targeting,
+  // defence/interception, and turn-to-turn unpredictability. (AI decision-logic only — stats/grabCap untouched.)
+  const D={easy:  {spd:.72, err:48, kick:.50, react:13, aimErr:.40, corner:.15, lead:.04, defend:.15},
+           normal:{spd:.90, err:26, kick:.78, react:5,  aimErr:.16, corner:.62, lead:.16, defend:.55},
+           hard:  {spd:1.0, err:10, kick:.95, react:1,  aimErr:.05, corner:.95, lead:.30, defend:1.0}}[diff]
+        || {spd:.90,err:26,kick:.78,react:5,aimErr:.16,corner:.62,lead:.16,defend:.55};
   const ka=(gameMode==='keepaway');
-  let tx,ty;
-  if(ball.owner==='t'){
-    if(ka){                             // keep-away: flee to open space, away from the human, never toward a goal
-      tx = players.p.x < W/2 ? W*0.72 : W*0.28;
-      ty = clamp(pl.y + (pl.y<H/2?70:-70), GY0+30, GY1-30);
-    }else{                              // goals: dribble toward the left goal
-      tx=FIELD.l+24; ty=clamp(ball.y+(H/2-ball.y)*0.25, GY0+14, GY1-14);
-    }
-  }else{                                // chase the ball anywhere on the field
-    tx=ball.x+PLAYER_R*0.5; ty=ball.y;
+  if(pl.aiTick==null){ pl.aiTick=0; pl.aiLastOwner='?'; pl.aiCorner=1; pl.aiLane=0; pl.aiTgt=null; }
+  // pick a fresh PLAN each new possession (and rarely mid-possession) so the AI isn't identical every kickoff
+  if(ball.owner!==pl.aiLastOwner || Math.random()<0.008){
+    pl.aiLastOwner=ball.owner;
+    const awayCorner = (players.p.y < H/2) ? 1 : -1;                  // attack the post FARTHER from the human
+    pl.aiCorner = (Math.random() < 0.5 + D.corner*0.5) ? awayCorner : -awayCorner;
+    pl.aiLane = (Math.random()-.5) * (ka?44:64) * (0.4 + D.defend);   // approach-lane / curl offset (varies the beeline)
   }
-  tx+=(Math.random()-.5)*D.err; ty+=(Math.random()-.5)*D.err;
-  let ax=tx-pl.x, ay=ty-pl.y; const m=Math.hypot(ax,ay)||1; ax/=m; ay/=m;
+  // RE-DECIDE the move target only every D.react frames → a felt reaction gap (easy lags a moving ball, hard tracks it)
+  pl.aiTick--;
+  if(pl.aiTick<=0 || !pl.aiTgt){
+    pl.aiTick=D.react;
+    let tx,ty;
+    if(ball.owner==='t'){
+      if(ka){ tx = players.p.x < W/2 ? W*0.72 : W*0.28; ty = clamp(pl.y + (pl.y<H/2?70:-70), GY0+30, GY1-30); }
+      else  { tx=FIELD.l+24; ty=clamp(ball.y+(H/2-ball.y)*0.25 + pl.aiLane*0.5, GY0+14, GY1-14); }   // dribble to goal, varied lane
+    }else{
+      let bx=ball.x + ball.vx*D.lead*6, by=ball.y + ball.vy*D.lead*6;     // anticipate where the ball is going
+      if(ball.owner==='p'){                                              // human attacking → drop goal-side to defend/intercept
+        bx = ball.x + (FIELD.r-ball.x)*0.28*D.defend;
+        by = ball.y + (clamp(ball.y,GY0,GY1)-ball.y)*0.2;
+      }
+      tx = bx + PLAYER_R*0.5 + pl.aiLane*0.3; ty = by + pl.aiLane*(ball.owner==='p'?0.25:0.5);
+    }
+    tx+=(Math.random()-.5)*D.err; ty+=(Math.random()-.5)*D.err;
+    pl.aiTgt={x:tx,y:ty};
+  }
+  let ax=pl.aiTgt.x-pl.x, ay=pl.aiTgt.y-pl.y; const m=Math.hypot(ax,ay)||1; ax/=m; ay/=m;
+  if(m>2) pl.aim=Math.atan2(pl.aiTgt.y-pl.y, pl.aiTgt.x-pl.x);          // face the target; shot aim is set explicitly below
   const dd=Math.hypot(ball.x-pl.x, ball.y-pl.y);
   const hd=Math.hypot(players.p.x-pl.x, players.p.y-pl.y);
   const sprint = pl.stamina>0.25 && (dd>175 || ball.owner==='t');
   applyMoveAI(pl,ax*D.spd, ay*D.spd, sprint);
   if(kickoffLock>0) kickoffLock--;
   if(ball.owner==='t'){
-    if(ka){                             // only poke it away under real pressure, aimed at centre (never a goal mouth)
+    if(ka){                             // keep-away: only poke it away under pressure, aimed at centre (never a goal mouth)
       if(kickoffLock===0 && hd<PLAYER_R*2.4 && Math.random()<D.kick*0.4){ pl.aim=Math.atan2(H/2-pl.y, W/2-pl.x); tryKick(pl,0.45); }
-    }else if(kickoffLock===0 && pl.x<W*0.46 && Math.random()<D.kick) tryKick(pl,0.85);     // shoot
+    }else if(kickoffLock===0 && pl.x<W*0.46 && Math.random()<D.kick){
+      const post = pl.aiCorner>0 ? GY1-16 : GY0+16;                    // SHOOT AT A GOAL CORNER (away from keeper), accuracy by tier
+      const aimY = clamp(ball.y + (post-ball.y)*D.corner, GY0+12, GY1-12);
+      pl.aim = Math.atan2(aimY-pl.y, FIELD.l-pl.x) + (Math.random()-.5)*D.aimErr;
+      tryKick(pl,0.85);
+    }
   }else if(kickoffLock===0 && dd<PLAYER_R+BALL_R+16 && Math.random()<D.kick*0.85){
-    tryKick(pl,0.7);                                             // win it / clear toward goal
+    const post = pl.aiCorner>0 ? GY1-16 : GY0+16;                      // win it and clear toward a corner, not dead straight
+    const aimY = clamp(ball.y + (post-ball.y)*D.corner*0.7, GY0+20, GY1-20);
+    pl.aim = Math.atan2(aimY-pl.y, FIELD.l-pl.x) + (Math.random()-.5)*D.aimErr;
+    tryKick(pl,0.7);
   }
 }
 function applyMoveAI(pl,ax,ay,sprint){

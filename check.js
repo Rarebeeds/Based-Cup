@@ -98,9 +98,12 @@ const STATS={
   chad:   {name:'CHAD',    abbr:'CHD', onball:7, offball:6, power:9,  defense:4,  dribble:5, stamina:5}
 };
 function paceOf(c){ const s=STATS[c]; return s.onball+s.offball; }   // derived display value, not assigned
+// stat -> movement-speed mapping (b56): widened from the old 4.2 + stat*0.16 (floor dominated, ~6% felt gap).
+// Lower floor + ~3x slope so on/off and char-to-char pace are clearly FELT (arcadey). Pivots ~stat 6 ≈ old mid-pace.
+const SPEED_FLOOR=2.1, SPEED_SLOPE=0.50;
 function statDerived(c){ const s=STATS[c]; return {
-  maxOn:  4.2 + s.onball*0.16,            // movement speed WHILE possessing the ball
-  maxOff: 4.2 + s.offball*0.16,           // movement speed WITHOUT the ball
+  maxOn:  SPEED_FLOOR + s.onball*SPEED_SLOPE,    // movement speed WHILE possessing the ball
+  maxOff: SPEED_FLOOR + s.offball*SPEED_SLOPE,   // movement speed WITHOUT the ball
   kickPow: 9 + s.power*0.9,               // shot power — charge + power stat ONLY (never velocity)
   stamDrain: 0.018 - s.stamina*0.0011,    // higher stamina drains slower
   stamRegen: 0.004 + s.stamina*0.0004,

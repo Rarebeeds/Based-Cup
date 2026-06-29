@@ -12,7 +12,8 @@ Read **CLAUDE.md** first (laws/build/deploy). Deep internals are in **PROJECT_BR
 
 ## Current build: **b51** (badge in `game_template.html`, search `based-cup bNN ✓`)
 Last verified: 14 characters load, START flow works, 0 errors, 0 leftover tokens, 0 placeholder sprites.
-⏳ b51 `index.html` is **built + validated but NOT yet uploaded to Vercel** (docs-only change; deploy held by user). Upload when ready.
+✅ **b51 DEPLOYED** — pushed to `origin/main` (commit `141b444`), Vercel auto-deploys from `main`. (Previous live build was b46.)
+This folder is now the git checkout (branch `main` tracking `origin/main`); deploy = `git push origin main`. Repo's `api/`, `package.json`, `supabase-schema.sql`, `README.md` are merged in alongside the working source.
 
 ---
 
@@ -81,7 +82,8 @@ Art source library: `OneDrive\Desktop\SOCC\CHARACTERS` (and the `C` subfolder = 
 ---
 
 ## Log
-- b51: **docs consolidation** — three live docs (CLAUDE = laws, STATE = state, PROJECT_BRIEF = deep reference); archived the stale b24 deep briefing to `archive/HANDOFF.b24-snapshot.md` (its still-current infra/gotchas migrated into PROJECT_BRIEF §12–13); CLAUDE trimmed to 1 page of laws/guards/commands; STATE got this pinned end-of-session rule + status board. No game code changed (badge bump only). Next: TURN server or 2v2 when the user picks.
+- b51 (deploy): **git wiring + first git-push deploy.** Made the working folder a real git checkout on `main` tracking `origin/main`; merged the deployed repo assets (`api/`, `package.json`, `supabase-schema.sql`, `README.md`) with the full local source via an unrelated-histories merge (only overlap was `index.html` — kept the validated b51, origin's old b46 stays in history). Pushed → `origin/main` `141b444`; Vercel auto-deploys from `main`. Deploy is now `git push` (was: manual upload) — CLAUDE.md updated. NOTE: the ~25 MB binary push takes >2 min — push in the background, don't kill on a foreground timeout. Next: TURN server or 2v2 when the user picks.
+- b51 (docs): **docs consolidation** — three live docs (CLAUDE = laws, STATE = state, PROJECT_BRIEF = deep reference); archived the stale b24 deep briefing to `archive/HANDOFF.b24-snapshot.md` (its still-current infra/gotchas migrated into PROJECT_BRIEF §12–13); CLAUDE trimmed to 1 page of laws/guards/commands; STATE got this pinned end-of-session rule + status board. No game code changed (badge bump only).
 - b50: crash-proof guard on `EXTRA_CHARS` (un-built file can't dead-screen) + root-caused the "won't start" bug = user was deploying `game_template.html` not `index.html`.
 - b49/b48: on-screen error reporter (+ copy button).
 - b47: head-soccer drawPlayer (no ring, face-centred, team pool).

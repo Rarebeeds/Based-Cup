@@ -46,8 +46,11 @@ python build.py          # game_template.html -> index.html (+ check.js, ids.jso
 node --check check.js    # syntax pass
 node harness.cjs         # load-time + missing-element check
 ```
-Then audit tokens (0) + bump the badge. The user uploads `index.html` to GitHub → Vercel auto-deploys
-(repo: github.com/Rarebeeds/Based-Cup). Relay changes (`lobby/server.js`) need a manual `fly deploy` (user does it).
+Then audit tokens (0) + bump the badge. **Deploy = git push** (this folder IS the git checkout, branch `main`
+tracking `origin/main`, repo github.com/Rarebeeds/Based-Cup): `git add index.html … && git commit && git push origin main`
+→ Vercel auto-deploys from `main`. Read is anonymous (public repo); push uses the cached write credential.
+⚠️ Pushing the ~25 MB of binaries can take >2 min — run the push in the background, don't kill it on a foreground timeout.
+**Never commit/deploy `game_template.html` as the served file** — only `index.html`. Relay changes (`lobby/server.js`) still need a manual `fly deploy` (user does it).
 
 ## Footguns (full list + infra identifiers in PROJECT_BRIEF §12–13)
 - Deploying the TEMPLATE instead of `index.html` (the #1 rule above).

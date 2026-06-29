@@ -86,9 +86,13 @@ One big `<script>`, roughly in this order:
 - Input: raw portrait `<key>.png` (solid bg). Output: `<key>_cut.png` (pepe/trumpe → `_cut_s.png`).
 - **Background removal:** edge flood-fill, `THRESH3=110` — deliberately BELOW pale-skin colour distance (~150)
   so white/pale wojak faces survive (at 200 they got eaten → invisible characters). If a face goes invisible, that's the knob.
-- **Face normalisation:** measure the face (width + chin), then scale every character so the **face is one width**,
-  **chin anchored to a fixed line**, centred on a fixed **360×450 frame**. So in-game all heads are the same size with
-  chins/eye-lines aligned. Per-char `ADJUST` nudges fix a few the auto-measure misreads (boomer/okeyjak/pdidpe).
+- **Head normalisation (b57):** measure hair-top + chin, then scale every character so the **visible head HEIGHT
+  (hair-top→chin) is one value** (`TARGET_HEAD_H=268`, ≈ the roster median so the group barely moved), **chin anchored to
+  a fixed line** (CHIN_FRAC 0.84 → row 378), centred by the head's own bbox on a fixed **360×450 frame**, with `SIDE_MARGIN`
+  width-contain so a wide head never clips the sides. So in-game every head renders the **same visual height** (74–75px),
+  chins aligned. (Before b57 it normalised cheek WIDTH, which let hair make heads render 57–83px — uneven.) `CHIN_OVERRIDE`
+  fixes 3/4-view chars whose jaw-narrowing fools the auto chin-detect (okeyjak: bald cranium → chin was cut at the mouth).
+  `ADJUST` (now empty) is the per-char fine size nudge if one still renders off-height.
 - Then build.py injects `<key>_cut.png` as base64; only characters whose `_cut.png` exists become selectable (`__EXTRA_CHARS__`).
 - ⚠️ OneDrive churns files in this folder (dehydrates/moves them). Backups of `_cut` sprites are kept in the session scratchpad.
 

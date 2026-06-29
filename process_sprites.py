@@ -29,14 +29,18 @@ OUT = {'pepe': 'pepe_cut_s.png', 'trumpe': 'trumpe_cut_s.png'}   # build reads t
 THRESH3 = 110       # bg colour distance; BELOW pale-skin distance so faces survive (not invisible)
 ALPHA = 40          # alpha above this counts as opaque when measuring the silhouette
 
-# --- fixed output frame: face normalised into this, so all heads align in-game ---
-FACE_W   = 200      # every character's face (cheek width) scaled to this many px
-CANVAS_W = 360      # frame width  (room for ears/wide hair without clipping)
-CANVAS_H = 450      # frame height (room for tall hair above the chin line)
+# --- fixed output frame: HEAD normalised into this so every head is the same VISIBLE size in-game ---
+CANVAS_W = 360      # frame width  (room for ears/wide hair)
+CANVAS_H = 450      # frame height
 CHIN_FRAC = 0.84    # the chin sits this far down the frame for EVERY character
-# manual size nudges for heads the auto face-width mis-measures (angled/bald faces):
-# >1 makes the head bigger, <1 smaller.
-ADJUST = {'boomer': 0.85, 'okeyjak': 1.20, 'pdidpe': 0.88}
+# b57: normalise by VISIBLE HEAD HEIGHT (hair-top -> chin), not cheek width, so all heads render the same
+# height in-game (drawPlayer scales the whole frame uniformly). ~= the old median so the group barely moves.
+TARGET_HEAD_H = 268     # every character's hair-top -> chin scaled to this many px
+SIDE_MARGIN   = 16      # keep this many px clear each side so a wide head never clips the frame
+# per-char chin fraction (of the silhouette top..bot) where the auto jaw-detect misreads (3/4 views):
+CHIN_OVERRIDE = {'okeyjak': 0.88}   # okeyjak's bald cranium fools the jaw-narrowing test -> chin cut at the mouth
+# fine size nudges if a char still renders off-height after normalisation (>1 bigger, <1 smaller):
+ADJUST = {}
 
 def remove_bg(im):
     px = im.load(); w, h = im.size
@@ -83,7 +87,7 @@ def face_metrics(im):
     for y in range(ymax + 1, bot + 1):
         if widths[y] < faceW * 0.66:
             chin = min(bot, y + int(faceW * 0.04)); break   # small fixed margin past the jaw
-    return dict(top=top, chin=chin, cx=cx, faceW=faceW)
+    return dict(top=top, chin=chin, cx=cx, faceW=faceW, bot=bot, widths=widths)
 
 def cut(name):
     src = root / (name + '.png')
@@ -96,19 +100,26 @@ def cut(name):
     m = face_metrics(im)
     if not m:
         print('skip', name, '— empty after bg removal'); return
-    s = (FACE_W * ADJUST.get(name, 1.0)) / max(1, m['faceW'])   # uniform face width, with per-char nudge
+    top, bot, widths = m['top'], m['bot'], m['widths']
+    # chin: per-char fraction override where the auto jaw-detect misreads, else the detected jaw
+    chin = round(top + (bot-top)*CHIN_OVERRIDE[name]) if name in CHIN_OVERRIDE else m['chin']
+    chin = max(top+1, min(bot, chin))
+    headH = chin - top                                          # the VISIBLE head we normalise
+    s = (TARGET_HEAD_H * ADJUST.get(name, 1.0)) / headH         # scale so head height -> TARGET_HEAD_H
+    maxW = max(widths[top:chin+1])                              # widest row within the head
+    if maxW * s > (CANVAS_W - 2*SIDE_MARGIN):                   # width-contain so a wide head never clips
+        s = (CANVAS_W - 2*SIDE_MARGIN) / maxW
     scaled = im.resize((max(1, round(im.width*s)), max(1, round(im.height*s))), Image.LANCZOS)
-    top_s, chin_s, cx_s = round(m['top']*s), round(m['chin']*s), round(m['cx']*s)
-    face = scaled.crop((0, top_s, scaled.width, chin_s))     # hair-top down to the chin, full width
+    top_s, chin_s = round(top*s), round(chin*s)
+    face = scaled.crop((0, top_s, scaled.width, chin_s))        # hair-top down to the chin, full width
+    fb = face.getbbox()
+    if fb: face = face.crop((fb[0], 0, fb[2], face.height))     # tighten horizontally (keep full top..chin)
     chinY = int(CANVAS_H * CHIN_FRAC)
-    if face.height > chinY:                                  # tall hair: shrink to fit, keep centre
-        f2 = chinY / face.height
-        face = face.resize((max(1, round(face.width*f2)), chinY), Image.LANCZOS); cx_s = round(cx_s*f2)
     canvas = Image.new('RGBA', (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
-    canvas.alpha_composite(face, (CANVAS_W//2 - cx_s, chinY - face.height))   # chin on the line, centred
+    canvas.alpha_composite(face, ((CANVAS_W - face.width)//2, chinY - face.height))   # centre head, chin on the line
     out = root / OUT.get(name, name + '_cut.png')
     canvas.save(out, optimize=True)
-    print('cut', name, '->', out.name, canvas.size, f'face={m["faceW"]}px', f'{out.stat().st_size//1024}KB')
+    print('cut', name, '->', out.name, f'headH {headH}->{face.height}', f'w={face.width}', f'{out.stat().st_size//1024}KB')
 
 for n in NAMES:
     cut(n)

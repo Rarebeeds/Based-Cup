@@ -86,13 +86,14 @@ One big `<script>`, roughly in this order:
 - Input: raw portrait `<key>.png` (solid bg). Output: `<key>_cut.png` (pepe/trumpe → `_cut_s.png`).
 - **Background removal:** edge flood-fill, `THRESH3=110` — deliberately BELOW pale-skin colour distance (~150)
   so white/pale wojak faces survive (at 200 they got eaten → invisible characters). If a face goes invisible, that's the knob.
-- **Head normalisation (b57):** measure hair-top + chin, then scale every character so the **visible head HEIGHT
-  (hair-top→chin) is one value** (`TARGET_HEAD_H=268`, ≈ the roster median so the group barely moved), **chin anchored to
-  a fixed line** (CHIN_FRAC 0.84 → row 378), centred by the head's own bbox on a fixed **360×450 frame**, with `SIDE_MARGIN`
-  width-contain so a wide head never clips the sides. So in-game every head renders the **same visual height** (74–75px),
-  chins aligned. (Before b57 it normalised cheek WIDTH, which let hair make heads render 57–83px — uneven.) `CHIN_OVERRIDE`
-  fixes 3/4-view chars whose jaw-narrowing fools the auto chin-detect (okeyjak: bald cranium → chin was cut at the mouth).
-  `ADJUST` (now empty) is the per-char fine size nudge if one still renders off-height.
+- **Face normalisation (b58):** scale every character so the **FACE WIDTH (cheek-to-cheek) is one value** (`FACE_W=240`) —
+  the size the eye reads as "head size" — with the **chin anchored to a fixed line** (CHIN_FRAC 0.84 → row 378), centred by
+  the head's own bbox on a fixed **360×450 frame**. Hair/ears/hats then **extend naturally above**, so overall silhouette
+  HEIGHT varies by hairstyle (244–350px) — that's correct. `TOP_MARGIN`/`SIDE_MARGIN` are fit-safeties so no hair/face ever
+  clips the frame. `ADJUST` ({boomer:0.85, okeyjak:1.20, pdidpe:0.88}) nudges chars whose bald cranium / 3-4 view mis-measures
+  the cheek row. `CHIN_OVERRIDE` ({okeyjak:0.88}) fixes 3/4 chars whose jaw-narrowing fools the auto chin-detect (okeyjak's
+  bald cranium → chin was being cut at the mouth). *(History: b46 width → b57 tried HEIGHT-normalisation [made faces look
+  wrong-sized: hair ate the budget] → b58 back to FACE WIDTH, which is what reads as consistent size.)*
 - Then build.py injects `<key>_cut.png` as base64; only characters whose `_cut.png` exists become selectable (`__EXTRA_CHARS__`).
 - ⚠️ OneDrive churns files in this folder (dehydrates/moves them). Backups of `_cut` sprites are kept in the session scratchpad.
 

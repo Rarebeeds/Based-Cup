@@ -29,18 +29,19 @@ OUT = {'pepe': 'pepe_cut_s.png', 'trumpe': 'trumpe_cut_s.png'}   # build reads t
 THRESH3 = 110       # bg colour distance; BELOW pale-skin distance so faces survive (not invisible)
 ALPHA = 40          # alpha above this counts as opaque when measuring the silhouette
 
-# --- fixed output frame: HEAD normalised into this so every head is the same VISIBLE size in-game ---
-CANVAS_W = 360      # frame width  (room for ears/wide hair)
+# --- fixed output frame: FACE normalised into this so every FACE reads the same SIZE in-game ---
+CANVAS_W = 360      # frame width
 CANVAS_H = 450      # frame height
 CHIN_FRAC = 0.84    # the chin sits this far down the frame for EVERY character
-# b57: normalise by VISIBLE HEAD HEIGHT (hair-top -> chin), not cheek width, so all heads render the same
-# height in-game (drawPlayer scales the whole frame uniformly). ~= the old median so the group barely moves.
-TARGET_HEAD_H = 268     # every character's hair-top -> chin scaled to this many px
-SIDE_MARGIN   = 16      # keep this many px clear each side so a wide head never clips the frame
-# per-char chin fraction (of the silhouette top..bot) where the auto jaw-detect misreads (3/4 views):
-CHIN_OVERRIDE = {'okeyjak': 0.88}   # okeyjak's bald cranium fools the jaw-narrowing test -> chin cut at the mouth
-# fine size nudges if a char still renders off-height after normalisation (>1 bigger, <1 smaller):
-ADJUST = {}
+# b58: normalise by FACE WIDTH (cheek-to-cheek) — the size the eye actually reads — NOT total bbox height.
+# Hair/ears then extend naturally above, so overall silhouette HEIGHT varies by hairstyle (correct & natural).
+FACE_W      = 240   # every character's cheek/face width scaled to this many px (the perceived size)
+TOP_MARGIN  = 10    # min clear px above the hair — vertical-fit safety so tall hair can't clip the frame top
+SIDE_MARGIN = 14    # min clear px each side
+# per-char chin fraction (of silhouette top..bot) where the auto jaw-detect misreads (3/4 views) — KEEP (b57 fix):
+CHIN_OVERRIDE = {'okeyjak': 0.88}   # okeyjak's bald cranium fools the jaw-narrowing test -> chin was cut at the mouth
+# face-width misread nudges (bald cranium / 3-4 view over- or under-measure the cheek row): >1 bigger, <1 smaller
+ADJUST = {'boomer': 0.85, 'okeyjak': 1.20, 'pdidpe': 0.88}
 
 def remove_bg(im):
     px = im.load(); w, h = im.size
@@ -100,26 +101,28 @@ def cut(name):
     m = face_metrics(im)
     if not m:
         print('skip', name, '— empty after bg removal'); return
-    top, bot, widths = m['top'], m['bot'], m['widths']
-    # chin: per-char fraction override where the auto jaw-detect misreads, else the detected jaw
+    top, bot, widths, faceW = m['top'], m['bot'], m['widths'], m['faceW']
+    # chin: per-char fraction override where the auto jaw-detect misreads, else the detected jaw (KEEP b57 fix)
     chin = round(top + (bot-top)*CHIN_OVERRIDE[name]) if name in CHIN_OVERRIDE else m['chin']
     chin = max(top+1, min(bot, chin))
-    headH = chin - top                                          # the VISIBLE head we normalise
-    s = (TARGET_HEAD_H * ADJUST.get(name, 1.0)) / headH         # scale so head height -> TARGET_HEAD_H
-    maxW = max(widths[top:chin+1])                              # widest row within the head
-    if maxW * s > (CANVAS_W - 2*SIDE_MARGIN):                   # width-contain so a wide head never clips
-        s = (CANVAS_W - 2*SIDE_MARGIN) / maxW
+    # scale so the FACE WIDTH is uniform -> consistent PERCEIVED size (hair height then varies, which is fine)
+    s = (FACE_W * ADJUST.get(name, 1.0)) / max(1, faceW)
+    chinY = int(CANVAS_H * CHIN_FRAC)
+    if (chin - top) * s > chinY - TOP_MARGIN:                   # vertical-fit safety: tall hair can't clip the top
+        s = (chinY - TOP_MARGIN) / (chin - top)
     scaled = im.resize((max(1, round(im.width*s)), max(1, round(im.height*s))), Image.LANCZOS)
     top_s, chin_s = round(top*s), round(chin*s)
     face = scaled.crop((0, top_s, scaled.width, chin_s))        # hair-top down to the chin, full width
     fb = face.getbbox()
     if fb: face = face.crop((fb[0], 0, fb[2], face.height))     # tighten horizontally (keep full top..chin)
-    chinY = int(CANVAS_H * CHIN_FRAC)
+    if face.width > CANVAS_W - 2*SIDE_MARGIN:                   # side-fit safety (rarely triggers; width is normalised)
+        f2 = (CANVAS_W - 2*SIDE_MARGIN) / face.width
+        face = face.resize((CANVAS_W - 2*SIDE_MARGIN, max(1, round(face.height*f2))), Image.LANCZOS)
     canvas = Image.new('RGBA', (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
-    canvas.alpha_composite(face, ((CANVAS_W - face.width)//2, chinY - face.height))   # centre head, chin on the line
+    canvas.alpha_composite(face, ((CANVAS_W - face.width)//2, chinY - face.height))   # centre face, chin on the line
     out = root / OUT.get(name, name + '_cut.png')
     canvas.save(out, optimize=True)
-    print('cut', name, '->', out.name, f'headH {headH}->{face.height}', f'w={face.width}', f'{out.stat().st_size//1024}KB')
+    print('cut', name, '->', out.name, f'faceW {faceW}->{round(faceW*s)}', f'headH={face.height}', f'{out.stat().st_size//1024}KB')
 
 for n in NAMES:
     cut(n)

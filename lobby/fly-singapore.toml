@@ -1,0 +1,18 @@
+## Based Cup lobby relay — Singapore region
+## Deploy this as a SECOND app (alongside your Sydney one) so players can choose.
+## If the app name is taken, change it AND tell Claude so the game URL matches.
+app = "basedcup-lobby-sin"
+primary_region = "sin"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

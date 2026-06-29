@@ -1,0 +1,22 @@
+## Based Cup lobby relay — US region
+## Deploy this as a THIRD app (alongside Sydney + Singapore) so US players can pick.
+## primary_region = "iad" is US-East (Ashburn, VA). For other US areas change it to:
+##   ord = Chicago (central)   dfw = Dallas (central)   sjc = San Jose (west)
+##   lax = Los Angeles (west)  sea = Seattle (west)     ewr = New Jersey (east)
+## If you change the app name, tell Claude so the game's US button matches.
+app = "basedcup-lobby-us"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # always-on so there's no cold-start lag mid-game
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

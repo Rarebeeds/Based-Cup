@@ -1,0 +1,18 @@
+## Based Cup lobby relay — Fly.io config (Sydney region)
+## If the app name below is taken, change it AND tell Claude so the game URL matches.
+app = "basedcup-lobby-syd"
+primary_region = "syd"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # keep one machine always running so there is no cold-start lag mid-game
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

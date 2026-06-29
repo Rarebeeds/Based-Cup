@@ -432,7 +432,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b54 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b55 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -963,32 +963,45 @@ const PLAYER_R=24, SPRITE_H=62;   // ~20% smaller; both players the SAME size
 const FACE_RF=0.278, FACE_CYF=0.62, FACE_FIT=1.15, CHIN_FRAC_DRAW=0.84;
 const SP_SCALE={pepe:1.0, trumpe:1.0, doomer:1.0, boomer:1.0, grandpa:1.0, soyjak:1.0, elon:1.0,
   obampe:1.0, okeyjak:1.0, oldwoj:1.0, pdidpe:1.0, sadjak:1.0, wojak:1.0, chad:1.0};
-// per-character stats (1-10) and their gameplay effect. Hit/control box is identical for all (grabCap);
-// only speed/power/stamina vary, and each character's total is balanced (~21).
+// 6-stat model (Phase 2, b55). Each char totals 36 (equal budget, lopsided spread → archetypes).
+// onball/offball = move speed with/without the ball; power = shot charge; defense = steal contest + closing
+// bonus; dribble = ball retention; stamina = sprint endurance. Pace (display) = onball+offball.
+// Hit/control box stays IDENTICAL for all (grabCap) — NO stat changes any radius.
 const STATS={
-  pepe:   {name:'PEPE',    abbr:'PEP', speed:9, power:5, stamina:6},
-  trumpe: {name:'TRUMPE',  abbr:'TRU', speed:6, power:9, stamina:8},
-  doomer: {name:'DOOMJAK', abbr:'DJK', speed:6, power:9, stamina:6},
-  boomer: {name:'ALEX',    abbr:'ALX', speed:5, power:7, stamina:9},
-  grandpa:{name:'EPPE',    abbr:'EPP', speed:4, power:8, stamina:9},
-  soyjak: {name:'SOYJAK',  abbr:'SOY', speed:5, power:8, stamina:7},
-  elon:   {name:'MUSKPE',  abbr:'MSK', speed:9, power:6, stamina:6},
-  obampe: {name:'OBAMPE',  abbr:'OBM', speed:7, power:6, stamina:8},
-  okeyjak:{name:'OKEYJAK', abbr:'OKJ', speed:6, power:7, stamina:7},
-  oldwoj: {name:'OLDJAK',  abbr:'OLD', speed:4, power:9, stamina:8},
-  pdidpe: {name:'PDIDPE',  abbr:'PDP', speed:8, power:7, stamina:6},
-  sadjak: {name:'SADJAK',  abbr:'SAD', speed:6, power:6, stamina:8},
-  wojak:  {name:'WOJAK',   abbr:'WOJ', speed:7, power:7, stamina:7},
-  chad:   {name:'CHAD',    abbr:'CHD', speed:8, power:9, stamina:6}
+  pepe:   {name:'PEPE',    abbr:'PEP', onball:9, offball:8, power:4,  defense:3,  dribble:8, stamina:4},
+  trumpe: {name:'TRUMPE',  abbr:'TRU', onball:4, offball:4, power:10, defense:7,  dribble:4, stamina:7},
+  doomer: {name:'DOOMJAK', abbr:'DJK', onball:5, offball:5, power:10, defense:5,  dribble:4, stamina:7},
+  boomer: {name:'ALEX',    abbr:'ALX', onball:4, offball:5, power:5,  defense:9,  dribble:4, stamina:9},
+  grandpa:{name:'EPPE',    abbr:'EPP', onball:3, offball:4, power:7,  defense:10, dribble:3, stamina:9},
+  soyjak: {name:'SOYJAK',  abbr:'SOY', onball:4, offball:5, power:9,  defense:7,  dribble:4, stamina:7},
+  elon:   {name:'MUSKPE',  abbr:'MSK', onball:8, offball:10,power:5,  defense:3,  dribble:5, stamina:5},
+  obampe: {name:'OBAMPE',  abbr:'OBM', onball:7, offball:7, power:6,  defense:6,  dribble:5, stamina:5},
+  okeyjak:{name:'OKEYJAK', abbr:'OKJ', onball:6, offball:6, power:6,  defense:5,  dribble:7, stamina:6},
+  oldwoj: {name:'OLDJAK',  abbr:'OLD', onball:3, offball:4, power:9,  defense:9,  dribble:3, stamina:8},
+  pdidpe: {name:'PDIDPE',  abbr:'PDP', onball:9, offball:7, power:5,  defense:3,  dribble:9, stamina:3},
+  sadjak: {name:'SADJAK',  abbr:'SAD', onball:5, offball:6, power:6,  defense:7,  dribble:5, stamina:7},
+  wojak:  {name:'WOJAK',   abbr:'WOJ', onball:6, offball:6, power:6,  defense:6,  dribble:6, stamina:6},
+  chad:   {name:'CHAD',    abbr:'CHD', onball:7, offball:6, power:9,  defense:4,  dribble:5, stamina:5}
 };
+function paceOf(c){ const s=STATS[c]; return s.onball+s.offball; }   // derived display value, not assigned
 function statDerived(c){ const s=STATS[c]; return {
-  maxBase: 4.2 + s.speed*0.16,            // pepe faster
-  kickPow: 9 + s.power*0.9,               // trumpe stronger shot
+  maxOn:  4.2 + s.onball*0.16,            // movement speed WHILE possessing the ball
+  maxOff: 4.2 + s.offball*0.16,           // movement speed WITHOUT the ball
+  kickPow: 9 + s.power*0.9,               // shot power — charge + power stat ONLY (never velocity)
   stamDrain: 0.018 - s.stamina*0.0011,    // higher stamina drains slower
-  stamRegen: 0.004 + s.stamina*0.0004 }; }
+  stamRegen: 0.004 + s.stamina*0.0004,
+  defense: s.defense, dribble: s.dribble }; }
 const imgFor=c=> IMG[c]||imgP;
 const BALL_R=13;
 const SPRINT_MULT=1.55;
+// ---- Stat-model tuning (Phase 2, b55) — easily tweakable. grabCap is NOT here (stays constant 48). ----
+const STEAL_BASE=0.30;        // per-contest steal chance when defender.defense == carrier.dribble (even match)
+const STEAL_WEIGHT=0.06;      // +/- chance per point of (defender.defense - carrier.dribble)
+const STEAL_MIN=0.05, STEAL_MAX=0.85;     // clamp on the contest chance (never a guaranteed strip, never 0)
+const STEAL_TRY_GAP=22;       // frames between contest attempts during sustained box overlap (~0.37s) — not spammable
+const STEAL_COOLDOWN=40;      // frames of grace after a successful steal (~0.67s) — prevents instant steal-back ping-pong
+const DRIBBLE_GLUE_MIN=0.30, DRIBBLE_GLUE_MAX=0.55;   // glueBall tightness mapped from dribble 1..10 (old fixed value was 0.40)
+const DEF_CLOSE_BONUS=0.06;   // off-ball speed bonus per defense point when chasing the ball carrier (modest closing speed)
 const MATCH_TIME=60;              // 1:00 per half (goals)
 const KEEPAWAY_TIME=90;          // keep-away is a single 1:30 period (no half-time)
 function matchLen(){ return gameMode==='keepaway' ? KEEPAWAY_TIME : MATCH_TIME; }
@@ -1034,7 +1047,8 @@ let timeLeft=MATCH_TIME, golden=false, lastTs=0, kickoffLock=0;
 function mkPlayer(x,y,who,char){ const d=statDerived(char);
   return {x,y,vx:0,vy:0,who,char,face:who==='p'?1:-1,
     kickCD:0,boost:0, aim: who==='p'?0:Math.PI, stamina:1, sprinting:false, charge:0, charging:false,
-    maxBase:d.maxBase, kickPow:d.kickPow, stamDrain:d.stamDrain, stamRegen:d.stamRegen}; }
+    maxOn:d.maxOn, maxOff:d.maxOff, kickPow:d.kickPow, stamDrain:d.stamDrain, stamRegen:d.stamRegen,
+    defense:d.defense, dribble:d.dribble}; }
 function reset(concededBy){
   const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
   players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };
@@ -1343,7 +1357,10 @@ function applyMove(pl,ax,ay,sprint){
   const moving=Math.hypot(ax,ay)>0.1;
   pl.sprinting = !!sprint && pl.stamina>0.02 && moving;
   pl.stamina = clamp(pl.stamina + (pl.sprinting?-pl.stamDrain:pl.stamRegen), 0, 1);
-  const ACC=pl.sprinting?1.25:1.0; let MAX=pl.maxBase*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  const ACC=pl.sprinting?1.25:1.0;
+  const base=(ball.owner===pl.who)?pl.maxOn:pl.maxOff;            // on-ball vs off-ball speed split
+  let MAX=base*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  if(ball.owner && ball.owner!==pl.who) MAX+=DEF_CLOSE_BONUS*(pl.defense||5);   // small closing-speed bonus when chasing the carrier
   if(gameMode==='keepaway' && ball.owner===pl.who) MAX*=0.75;   // ball-holder is 25% slower in keep-away
   pl.vx+=ax*ACC; pl.vy+=ay*ACC;
   const sp=Math.hypot(pl.vx,pl.vy);
@@ -1439,7 +1456,10 @@ function applyMoveAI(pl,ax,ay,sprint){
   const moving=Math.hypot(ax,ay)>0.1;
   pl.sprinting = !!sprint && pl.stamina>0.02 && moving;
   pl.stamina = clamp(pl.stamina + (pl.sprinting?-pl.stamDrain:pl.stamRegen), 0, 1);
-  const ACC=pl.sprinting?1.25:1.0; let MAX=(pl.maxBase*0.92)*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  const ACC=pl.sprinting?1.25:1.0;
+  const base=((ball.owner===pl.who)?pl.maxOn:pl.maxOff)*0.92;     // on/off split, with the AI's existing 0.92 handicap
+  let MAX=base*(pl.sprinting?SPRINT_MULT:1)+pl.boost;
+  if(ball.owner && ball.owner!==pl.who) MAX+=DEF_CLOSE_BONUS*(pl.defense||5);   // CPU also gets the closing-speed bonus
   if(gameMode==='keepaway' && ball.owner===pl.who) MAX*=0.75;   // ball-holder is 25% slower in keep-away
   pl.vx+=ax*ACC; pl.vy+=ay*ACC;
   const sp=Math.hypot(pl.vx,pl.vy);
@@ -1472,9 +1492,19 @@ function updatePossession(){
   if(cur){
     const cd=cur==='p'?dp:dt, od=cur==='p'?dt:dp;
     const capCur=cur==='p'?capP:capT, capOpp=cur==='p'?capT:capP;
-    if(cd>capCur+8) ball.owner=null;                       // dribbled too far / knocked loose
-    else if(od<cd-12 && od<capOpp){ sfxGrunt(players[cur].char); const nw=(cur==='p'?'t':'p');
-      if(nw!==ball.shooter) ball.oppTouch=true; ball.owner=nw; }  // tackled — loser grunts
+    if(ball.stealCD>0) ball.stealCD--;                     // tick the steal-contest cooldown
+    if(cd>capCur+8){ ball.owner=null; }                    // carrier overextended -> ball comes loose (unchanged)
+    // STEAL = a CONTEST, not an auto-strip. Boxes are IDENTICAL (grabCap); when the defender's box overlaps a
+    // dribbling carrier, defense-vs-dribbling decides who wins, gated by a cooldown so it isn't spammable.
+    else if(oppActive && od<capOpp && (ball.stealCD||0)<=0){
+      const opp=(cur==='p'?'t':'p'), carrier=players[cur], defender=players[opp];
+      const gap=(defender.defense||5)-(carrier.dribble||5);                 // + = defender favoured, - = carrier favoured
+      const p=clamp(STEAL_BASE + gap*STEAL_WEIGHT, STEAL_MIN, STEAL_MAX);
+      if(Math.random()<p){                                                  // defender wins the contest
+        if(opp!==ball.shooter) ball.oppTouch=true;
+        sfxGrunt(carrier.char); ball.owner=opp; ball.stealCD=STEAL_COOLDOWN;
+      }else ball.stealCD=STEAL_TRY_GAP;                                     // failed -> brief gap before the next attempt
+    }
   }else{
     if(dp<capP && dp<=dt){ ball.owner='p'; rebChk('p'); }
     else if(oppActive && dt<capT){ ball.owner='t'; rebChk('t'); }
@@ -1497,7 +1527,9 @@ function glueBall(){
   const pl=players[ball.owner];
   const hold=PLAYER_R+BALL_R-6;
   const hx=pl.x+Math.cos(pl.aim)*hold, hy=pl.y+Math.sin(pl.aim)*hold;
-  const px=ball.x, py=ball.y, GRAB=0.4;        // 0.4 = slightly stuck -> can spin freely
+  const px=ball.x, py=ball.y;
+  const drb=(pl.dribble!=null?pl.dribble:5);   // higher dribbling = tighter glue (harder to knock loose)
+  const GRAB=DRIBBLE_GLUE_MIN + (drb/10)*(DRIBBLE_GLUE_MAX-DRIBBLE_GLUE_MIN);
   ball.x+=(hx-ball.x)*GRAB; ball.y+=(hy-ball.y)*GRAB;
   ball.vx=ball.x-px; ball.vy=ball.y-py;
   ball.x=clamp(ball.x,FIELD.l+BALL_R,FIELD.r-BALL_R); // no scoring while dribbling — kick it in
@@ -2587,7 +2619,8 @@ function paintCharCards(){   // kept name for callers; renders the carousel
   const st=$('charStage'); if(st) st.setAttribute('data-char', c);
   const bi=$('charBigImg'); if(bi) bi.src = imgFor(c).src;
   const bn=$('charBigName'); if(bn){ bn.textContent=s.name; bn.style.color=(c==='pepe'?'#69db7c':'#ff8787'); }
-  if($('csSpeed')) $('csSpeed').style.width=s.speed*10+'%';
+  // compat shim only (the OLD 3-bar carousel) so it doesn't render NaN with the new stats — Phase 3 redesigns this card.
+  if($('csSpeed')) $('csSpeed').style.width=(s.onball+s.offball)*5+'%';   // Pace = on-ball + off-ball (0..20)
   if($('csPower')) $('csPower').style.width=s.power*10+'%';
   if($('csStam'))  $('csStam').style.width=s.stamina*10+'%';
 }
@@ -2661,7 +2694,10 @@ function predictGuestSelf(){
   // so the prediction doesn't run faster than the authoritative sim and get yanked back.
   const sprint=(keys['shiftleft']||keys['shift']||touchSprint) && (t.stamina!=null ? t.stamina>0.02 : true) && m>0.1;
   const ACC=sprint?1.25:1.0;
-  const MAX=t.maxBase*(sprint?SPRINT_MULT:1)*((gameMode==='keepaway'&&ball.owner==='t')?0.75:1);
+  const gbase=(ball.owner==='t')?t.maxOn:t.maxOff;               // mirror the host's on/off split for our own player
+  let MAX=gbase*(sprint?SPRINT_MULT:1);
+  if(ball.owner && ball.owner!=='t') MAX+=DEF_CLOSE_BONUS*(t.defense||5);        // and the closing-speed bonus
+  if(gameMode==='keepaway'&&ball.owner==='t') MAX*=0.75;
   gp.vx+=ax*ACC; gp.vy+=ay*ACC;
   const sp=Math.hypot(gp.vx,gp.vy); if(sp>MAX){gp.vx=gp.vx/sp*MAX; gp.vy=gp.vy/sp*MAX;}
   gp.vx*=0.84; gp.vy*=0.84; gp.x+=gp.vx; gp.y+=gp.vy;

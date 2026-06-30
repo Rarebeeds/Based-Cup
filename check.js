@@ -1880,7 +1880,7 @@ function startQuickMatch(){
   audioInit();
   if(!account){ showAuth(); return; }
   // humanChar + gameMode were chosen on the select screen
-  $('startScreen').classList.add('hide'); $('selectScreen').classList.add('hide'); $('matchScreen').classList.remove('hide');
+  hideAllOverlays(); $('matchScreen').classList.remove('hide');   // BUGFIX (b73): clear the PLAY hub / wager screen before showing the search screen (was left under it)
   $('meName').textContent=account.username; $('oppName').textContent='…';
   $('matchStatus').textContent='Searching for opponents'; $('matchNote').textContent='Finding a live opponent…';
   quickMode=true; quickStruggle=false;
@@ -2518,8 +2518,7 @@ function _beginGameOnline(role){
   netKickPrev=false; NET.state=null; NET.buf=[]; stateSendAcc=0; gInputAcc=0;
   NET.guestInput={ax:0,ay:0,aim:Math.PI,sprint:false,kick:false};
   recordOpponent(NET.peerName);
-  ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','onlineScreen','profileScreen','inboxScreen','lockerScreen']
-    .forEach(s=>$(s).classList.add('hide'));
+  hideAllOverlays();   // BUGFIX (b73): hide EVERY menu overlay — the old explicit list missed the PLAY hub (modeSelectScreen) + wager screen, leaving them painted over the live match
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
   $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide'); setMenuDocks(false); $('pCard').classList.remove('hide'); $('tCard').classList.remove('hide');
   $('pauseBtn').textContent='❚❚'; enterMatchChrome();
@@ -3041,8 +3040,7 @@ addEventListener('resize', checkOrient);
 addEventListener('orientationchange', ()=>setTimeout(checkOrient,150));
 function beginGame(){ oppChar=null; showLoadingThen(_beginGame); }   // practice/local: opponent is the opposite character
 function _beginGame(){
-  ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','profileScreen','inboxScreen','lockerScreen']
-    .forEach(s=>$(s).classList.add('hide'));
+  hideAllOverlays();   // BUGFIX (b73): dismiss every menu overlay at match start (robust — no hub/wager/store screen can survive into play)
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
   $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide'); setMenuDocks(false);
   $('pCard').classList.remove('hide');

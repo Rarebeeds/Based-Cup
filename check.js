@@ -223,7 +223,8 @@ function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; ti
   setMeta(''); updateHUD(); reset(); goalLock=0;
   goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
   slowmoT=0; netSlowmo=false; motionScale=1; camZoom=1; camFocusX=W/2; camFocusY=H/2;
-  slowmoCamMode='ball'; slowmoCamSide='R'; netCamMode='ball'; netCamSide='R';}   // reset goal-juice + slow-mo + camera each match
+  slowmoCamMode='ball'; slowmoCamSide='R'; netCamMode='ball'; netCamSide='R';   // reset goal-juice + slow-mo + camera each match
+  startMatchStats();}   // BUILD 2: fresh per-character stat accumulator for this match
 function halfLabel(){ if(gameMode==='keepaway') return 'KEEP-AWAY · HOLD IT';
   return half===2?'2ND HALF':'1ST HALF'; }
 
@@ -674,7 +675,9 @@ function updatePossession(){
       const opp=(cur==='p'?'t':'p'), carrier=players[cur], defender=players[opp];
       const gap=(defender.defense||5)-(carrier.dribble||5);                 // + = defender favoured, - = carrier favoured
       const p=clamp(STEAL_BASE + gap*STEAL_WEIGHT, STEAL_MIN, STEAL_MAX);
-      if(Math.random()<p){                                                  // defender wins the contest
+      const stolen=Math.random()<p;
+      recordContest(cur, opp, stolen);                                      // BUILD 2: observe-only (one pressure event -> carrier dribble + defender tackle)
+      if(stolen){                                                          // defender wins the contest
         if(opp!==ball.shooter) ball.oppTouch=true;
         sfxGrunt(carrier.char); ball.owner=opp; ball.stealCD=STEAL_COOLDOWN;
       }else ball.stealCD=STEAL_TRY_GAP;                                     // failed -> brief gap before the next attempt
@@ -767,6 +770,7 @@ function scoreGoal(who){
   if(gameMode==='keepaway'){ showToast('LOOSE BALL!','#9bf6a8'); setTimeout(()=>reset(),650); return; }
   if(slowmoGateOk()) slowmoT=Math.max(slowmoT, GOAL_SLOWMO_MS/1000);   // gated decider: slow-mo the explosion too (margin read PRE-increment)
   score[who]++; updateHUD();
+  recordGoalStat(who);   // BUILD 2: per-character goals scored / conceded / own-goal (observe-only)
   showToast('GOAL!', who==='p'?'#69db7c':'#ff8787');
   { const el=document.getElementById('toast'); if(el){ el.classList.remove('slam'); void el.offsetWidth; el.classList.add('slam'); } }   // slam-in
   const fxSide = ball.netSide || (who==='t'?'L':'R');     // 'L'/'R' = which goal was scored in
@@ -811,6 +815,7 @@ function endGame(who){
   state='win';
   if(netRole==='host') sendState({st:'win', win:who});   // tell the guest the match is over
   if(ranked && account) recordResult(who==='p');   // endGame is always the local (left) player's perspective
+  commitMatchStats(who);   // BUILD 2: per-character record — host commits its own + relays the guest its own (no double-count)
   document.getElementById('winScreen').classList.remove('hide');
   const pName = players? STATS[players.p.char].name : 'PEPE';
   const tName = players? STATS[players.t.char].name : 'TRUMPE';
@@ -1386,7 +1391,7 @@ function refreshAcctBtn(){
   $('acctBtn').classList.remove('hide'); $('bellBtn').classList.remove('hide');
   refreshGuestBanner();
   loadEquipped();                                            // per-account equipped character (local)
-  if(sbUser && !_equipSynced){ _equipSynced=true; syncEquippedFromCloud(); }   // one-shot cross-device pull
+  if(sbUser && !_equipSynced){ _equipSynced=true; syncEquippedFromCloud(); syncCharStatsFromCloud(); }   // one-shot cross-device pull (equipped + per-char record)
 }
 
 // ---- $BASED coins (in-game currency; mirrored to Supabase profiles) ----
@@ -1975,11 +1980,56 @@ function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=S
 
 // per-character RECORD store — BUILD 2 populates this. Local now (cloud-mirrorable later). Returns
 // safe zeros so the card BACK renders cleanly with no data yet.
-function charRecordAll(){ try{ return JSON.parse(DB.get('sh_crec_'+(((account&&account.username)||'guest')+'').toLowerCase())||'{}'); }catch(_){ return {}; } }
+function charRecordAll(){ const v=DB.get(crecKey()); return (v && typeof v==='object') ? v : {}; }   // DB.get already parses — no double-parse
 function getCharRecord(c){ const r=charRecordAll()[c]||{};
   return { wins:r.wins||0, losses:r.losses||0, gf:r.gf||0, ga:r.ga||0, og:r.og||0,
            dribbleOk:r.dribbleOk||0, dribbleTry:r.dribbleTry||0, tackleOk:r.tackleOk||0, tackleTry:r.tackleTry||0 }; }
 function recPct(ok,tot){ return tot>0 ? Math.round(ok/tot*100)+'%' : '—'; }
+
+// ===== BUILD 2: per-character match stat TRACKING (observe existing events; record; no gameplay change) =====
+function crecKey(){ return 'sh_crec_'+(((account&&account.username)||'guest')+'').toLowerCase(); }
+function statBlank(){ return {wins:0,losses:0,gf:0,ga:0,og:0,dribbleOk:0,dribbleTry:0,tackleOk:0,tackleTry:0}; }
+// merge a finished-match delta for ONE character into the store (local + guarded Supabase mirror).
+function commitCharStats(char, rec){
+  if(!char || !rec) return;
+  const all=charRecordAll(), cur=Object.assign(statBlank(), all[char]||{});
+  Object.keys(statBlank()).forEach(k=>{ cur[k]+=(rec[k]||0); });
+  all[char]=cur; DB.set(crecKey(), all);
+  if(sb && sbUser){ try{ sb.from('profiles').update({char_stats:all}).eq('id',sbUser.id); }catch(_){} }   // needs the char_stats column (guarded — never breaks if absent)
+}
+async function syncCharStatsFromCloud(){ if(!sb||!sbUser) return;
+  try{ const {data}=await sb.from('profiles').select('char_stats').eq('id',sbUser.id).single();
+    if(data && data.char_stats) DB.set(crecKey(), data.char_stats); }catch(_){} }
+// per-MATCH accumulator. AUTHORITATIVE side only (host + offline) — the guest never runs the sim,
+// so it can't double-count; it receives its OWN deltas from the host at match end.
+let matchStat=null, matchStatDone=false, statTracking=false;
+function localStatSide(){ return netRole==='guest' ? 't' : 'p'; }   // the player THIS client controls
+// track every real match WITH an opponent: online + practice-vs-CPU + local 2P. Solo (no opponent) is excluded.
+function startMatchStats(){ matchStat={p:statBlank(), t:statBlank()}; matchStatDone=false; statTracking=oppActive; }
+// one finished steal CONTEST (the existing pressure event) feeds BOTH sides' rates at once.
+function recordContest(carrier, defender, stolen){
+  if(!matchStat || !statTracking) return;
+  matchStat[carrier].dribbleTry++; matchStat[defender].tackleTry++;
+  if(stolen) matchStat[defender].tackleOk++;     // defender won the ball -> tackle success (carrier dribble fail)
+  else       matchStat[carrier].dribbleOk++;     // carrier kept possession -> dribble success (defender tackle fail)
+}
+function recordGoalStat(who){                     // scoreboard-consistent gf/ga + own-goal sub-flag
+  if(!matchStat || !statTracking) return;
+  const opp=who==='p'?'t':'p';
+  matchStat[who].gf++; matchStat[opp].ga++;
+  if(ball.shooter===opp) matchStat[opp].og++;     // the conceding side shot it into its OWN net
+}
+// commit at match end (host + offline). Host also relays the GUEST its own deltas; the guest applies
+// only what it's sent (it never accumulated) -> each player's stats land on their own profile, once.
+function commitMatchStats(winSide){
+  if(!matchStat || !statTracking || matchStatDone) return;
+  matchStatDone=true;
+  matchStat[winSide].wins=1; matchStat[winSide==='p'?'t':'p'].losses=1;
+  const mine=localStatSide();
+  if(players && players[mine]) commitCharStats(players[mine].char, matchStat[mine]);
+  if(netRole==='host'){ const og=mine==='p'?'t':'p';
+    if(players && players[og]) NET.relay({charStats:{char:players[og].char, rec:matchStat[og]}}); }
+}
 
 let loIdx=0, loBuilt=false;
 function lockerFrontHTML(c){ const s=STATS[c];
@@ -2250,6 +2300,7 @@ function handleNet(m){
 // data channel. Both call this so the handling is identical regardless of transport.
 function onRelayData(d){
     if(d.rtc){ NET.p2pHandle(d.rtc); return; }     // WebRTC signalling rides the relay channel
+    if(d.charStats){ if(netRole==='guest') commitCharStats(d.charStats.char, d.charStats.rec); return; }   // BUILD 2: guest applies its own per-char deltas from the host
     if(d.hello){ NET.peerName=d.hello.name; }
     else if(d.start){ humanChar=d.start.hostChar; NET.peerName=d.start.hostName||NET.peerName; gameMode=d.start.mode||'goals';
       setupGuestWager(d.start); beginGameOnline('guest'); }

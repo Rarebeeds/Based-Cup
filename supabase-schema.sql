@@ -55,6 +55,7 @@ $$;
 -- ====== Locker: equipped character (b70) — OPTIONAL (local persistence works without it;
 -- this enables cross-device equip). Run once: ======
 alter table profiles add column if not exists equipped text;
+alter table profiles add column if not exists char_stats jsonb;
 
 -- ====== Hourly + All-Time leaderboards (b69) ======
 -- Both read the SAME match_results table. HOURLY filters to the current Brisbane/AEST

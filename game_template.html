@@ -467,7 +467,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b65 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b66 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1093,6 +1093,11 @@ const SLOWMO_ZONE=110;         // px in front of a goal line where a fast goal-b
 const SLOWMO_BALL_SPEED=6;     // min ball speed toward the goal (px/frame) to count as a real goal-bound shot
 const SLOWMO_LAST_SECS=20;     // gate: only inside the last N seconds...
 const SLOWMO_MARGIN=1;         // ...of the 2nd half, and only when the pre-goal score margin <= this (tied / one-goal game)
+// Pass 2 (b66): only arm if the DEFENDER physically can't reach the ball's path before it crosses the line.
+const SLOWMO_DEF_SPEED_K=1.0;  // multiplier on the defender's max speed in the reach calc (<1 = more generous toward arming)
+const SLOWMO_REACH_MARGIN=14;  // px the defender must BEAT the ball's path by to count as "can stop" (higher = arms more)
+const SLOWMO_POST_GRACE=34;    // px past the goal mouth the path may exit and still arm (near-post drama); beyond = clear miss -> no slow-mo
+let SLOWMO_DEBUG=false;        // set true (here/console) to console.log the reach calc when a goal-bound shot is evaluated
 const SLOWMO_ZOOM=1.5;         // cinematic zoom-in during slow-mo (1.0 = no zoom)
 const SLOWMO_ZOOM_EASE=0.14;   // how fast the zoom eases in/out
 const SLOWMO_FOLLOW_EASE=0.35; // how tightly the camera tracks its focus (ball/goal) during slow-mo — higher = snappier
@@ -1833,6 +1838,29 @@ function slowmoGateOk(){
   if(FORCE_GOAL_SLOWMO) return true;
   return gameMode==='goals' && half===2 && timeLeft<=SLOWMO_LAST_SECS && Math.abs(score.p-score.t)<=SLOWMO_MARGIN;
 }
+// Pass 2: true only if the DEFENDER physically can't reach the ball's path before it crosses the line (unstoppable).
+function shotIsPlayerUnstoppable(side){
+  if(!players || !ball) return false;
+  const lineX = side==='L' ? FIELD.l : FIELD.r, vx=ball.vx;
+  if((side==='L' && vx>=-0.5) || (side==='R' && vx<=0.5)) return false;         // not actually heading at this goal
+  const tCross = (lineX - ball.x)/vx;                                           // frames until it reaches the goal line
+  if(tCross<=0 || tCross>200) return false;                                     // behind it / too slow to matter
+  const yAtLine = ball.y + ball.vy*tCross;                                      // where the path exits the line
+  if(yAtLine < GY0-SLOWMO_POST_GRACE || yAtLine > GY1+SLOWMO_POST_GRACE) return false;  // clear miss -> wall/post stops it
+  const def = (side==='L') ? players.p : players.t;                             // L goal defended by p, R goal by t
+  if(!def) return false;
+  const cap = grabCap(def);                                                     // identical reach (48)
+  const maxSpd = ((def.maxOff||5) + DEF_CLOSE_BONUS*(def.defense||5)) * SLOWMO_DEF_SPEED_K;   // off-ball + closing bonus
+  let canStop=false, best=1e9;
+  for(let i=0;i<=10;i++){                                                       // sample the path; can the defender beat the ball to ANY point?
+    const t=tCross*i/10, px=ball.x+vx*t, py=ball.y+ball.vy*t;
+    const need=Math.hypot(def.x-px, def.y-py)-cap;                             // distance the defender must still close
+    best=Math.min(best, need - maxSpd*t);
+    if(need <= maxSpd*t - SLOWMO_REACH_MARGIN){ canStop=true; break; }         // reaches it (with margin) -> stoppable
+  }
+  if(SLOWMO_DEBUG) console.log('[slowmo] side',side,'tCross',tCross.toFixed(1),'yAtLine',Math.round(yAtLine),'defMaxSpd',maxSpd.toFixed(2),'closeGap',best.toFixed(1),'->',canStop?'STOPPABLE':'UNSTOPPABLE');
+  return !canStop;                                                              // nobody can intervene -> unstoppable
+}
 // arm slow-mo as a fast, goal-bound free shot ENTERS the zone in front of either mouth (host/local only)
 function maybeArmSlowmo(){
   if(!ball || ball.owner || ball.netSide) return;                  // no free shot in flight
@@ -1840,8 +1868,10 @@ function maybeArmSlowmo(){
   const nearL = ball.x < FIELD.l+SLOWMO_ZONE && ball.vx < -SLOWMO_BALL_SPEED;   // screaming into the LEFT goal
   const nearR = ball.x > FIELD.r-SLOWMO_ZONE && ball.vx >  SLOWMO_BALL_SPEED;   // screaming into the RIGHT goal
   if((nearL||nearR) && slowmoGateOk()){
-    if(slowmoT<=0){                                  // FIRST arm: pick the cinematic framing ONCE (never flip mid-slow-mo)
-      slowmoCamSide = nearL ? 'L' : 'R';             // the goal being scored on
+    const side = nearL ? 'L' : 'R';
+    if(slowmoT<=0){                                  // decide ONCE as the shot ENTERS the zone (reach + framing); never flip mid-slow-mo
+      if(!FORCE_GOAL_SLOWMO && !shotIsPlayerUnstoppable(side)) return;          // Pass 2: only arm if the defender can't reach it
+      slowmoCamSide = side;                          // the goal being scored on
       const strikeX = (ball.kickX!=null) ? ball.kickX : ball.x;          // where the shot was STRUCK from (set in tryKick)
       // short-range = struck INSIDE the opponent's half (the half holding the target goal) -> LOCK on that goal.
       // long-range  = struck from own half / beyond halfway -> FOLLOW the ball the whole way in.

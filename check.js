@@ -97,7 +97,7 @@ const STATS={
   elon:   {name:'MUSKPE',   abbr:'MSK', arch:'Speedster',          pace:20, def:9,  sta:14, drb:16, pow:13, div:18, grab:48},
   obampe: {name:'OBAMPE',   abbr:'OBM', arch:'All-rounder',        pace:15, def:14, sta:14, drb:14, pow:14, div:13, grab:49},
   okeyjak:{name:'OKEYJAK',  abbr:'OKJ', arch:'All-rounder',        pace:13, def:13, sta:14, drb:15, pow:13, div:11, grab:49},
-  oldwoj: {name:'OLDJAK',   abbr:'OLD', arch:'Defensive Wall',     pace:8,  def:19, sta:16, drb:9,  pow:16, div:9,  grab:52},
+  oldwoj: {name:'OLDJAK',   abbr:'OLD', arch:'Defensive Flagship', pace:8,  def:20, sta:19, drb:11, pow:18, div:18, grab:52},   // b76: elite defender (OVR 94, Netherite) — counterpart to ALEX
   pdidpe: {name:'PDIDPE',   abbr:'PDP', arch:'Dribbler',           pace:17, def:10, sta:12, drb:20, pow:13, div:14, grab:48},
   sadjak: {name:'SADJAK',   abbr:'SAD', arch:'All-rounder',        pace:12, def:15, sta:15, drb:12, pow:13, div:11, grab:50},
   wojak:  {name:'WOJAK',    abbr:'WOJ', arch:'All-rounder',        pace:14, def:14, sta:14, drb:14, pow:14, div:12, grab:49},

@@ -438,7 +438,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b59 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b60 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1055,6 +1055,14 @@ const GOAL_SLOWMO_SCALE=0.30;   // strength of the slow-mo beat — set to 1.0 t
 const GOAL_SLOWMO_MS=320;       // how long the slow-mo beat lasts (wall-clock ms)
 const GOAL_FX_MS=950;           // total explosion duration (ms)
 const GOAL_SHAKE=24;            // initial screen-shake amplitude (px)
+// --- slow-mo arming + gating (b60). Slow-mo dilates VISUAL time (sim frame-pulldown + the FX clock); it never
+//     touches the match clock (timeLeft), the netcode protocol, or the scoring/half OUTCOME. ---
+const SLOWMO_ZONE=110;         // px in front of a goal line where a fast goal-bound shot ARMS the slow-mo (anticipation)
+const SLOWMO_BALL_SPEED=6;     // min ball speed toward the goal (px/frame) to count as a real goal-bound shot
+const SLOWMO_LAST_SECS=20;     // gate: only inside the last N seconds...
+const SLOWMO_MARGIN=1;         // ...of the 2nd half, and only when the pre-goal score margin <= this (tied / one-goal game)
+let FORCE_GOAL_SLOWMO=false;   // DEBUG: set true (here, or live in the console) => EVERY goal slow-mos, ignoring the gate
+let slowmoT=0, slowAcc=0, netSlowmo=false;   // slow-mo remaining (s) · frame-pulldown accumulator · guest's streamed flag
 let goalFx=null, shakeAmp=0;    // active explosion + screen-shake amplitude
 let goalSeq=0, goalFxSide='', goalSeen=0;   // streamed goal-event counter (host increments, guest detonates on change)
 let gameMode='goals', possP=0, possT=0;   // keepaway mode: hold the ball longest
@@ -1077,7 +1085,8 @@ function reset(concededBy){
 function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; timeLeft=matchLen(); golden=false;
   clearTimeout(htTimer); hideHalftime();
   setMeta(''); updateHUD(); reset(); goalLock=0;
-  goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;}   // reset goal-juice state each match (no kickoff text — the banner announces the mode)
+  goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
+  slowmoT=0; slowAcc=0; netSlowmo=false;}   // reset goal-juice + slow-mo state each match (no kickoff text — the banner announces the mode)
 function halfLabel(){ if(gameMode==='keepaway') return 'KEEP-AWAY · HOLD IT';
   return half===2?'2ND HALF':'1ST HALF'; }
 
@@ -1619,6 +1628,7 @@ function scoreGoal(who){
   if(goalLock>0)return;
   goalLock=70;
   if(gameMode==='keepaway'){ showToast('LOOSE BALL!','#9bf6a8'); setTimeout(()=>reset(),650); return; }
+  if(slowmoGateOk()) slowmoT=Math.max(slowmoT, GOAL_SLOWMO_MS/1000);   // gated decider: slow-mo the explosion too (margin read PRE-increment)
   score[who]++; updateHUD();
   showToast('GOAL!', who==='p'?'#69db7c':'#ff8787');
   { const el=document.getElementById('toast'); if(el){ el.classList.remove('slam'); void el.offsetWidth; el.classList.add('slam'); } }   // slam-in
@@ -1779,6 +1789,20 @@ function drawTitleScene(){
   ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
 }
 // ---- Goal explosion: blast the two heads + ball AWAY from the scored-in goal (visual only) ----
+// slow-mo gate: a dramatic decider — 2nd half, last 20s, pre-goal score margin <= 1 (or FORCE for feel-testing)
+function slowmoGateOk(){
+  if(FORCE_GOAL_SLOWMO) return true;
+  return gameMode==='goals' && half===2 && timeLeft<=SLOWMO_LAST_SECS && Math.abs(score.p-score.t)<=SLOWMO_MARGIN;
+}
+// arm slow-mo as a fast, goal-bound free shot ENTERS the zone in front of either mouth (host/local only)
+function maybeArmSlowmo(){
+  if(slowmoT>0 || !ball || ball.owner || ball.netSide) return;     // already armed, or no free shot in flight
+  if(!(ball.y>GY0 && ball.y<GY1)) return;                          // must be on target (inside the mouth)
+  const nearL = ball.x < FIELD.l+SLOWMO_ZONE && ball.vx < -SLOWMO_BALL_SPEED;   // screaming into the LEFT goal
+  const nearR = ball.x > FIELD.r-SLOWMO_ZONE && ball.vx >  SLOWMO_BALL_SPEED;   // screaming into the RIGHT goal
+  if((nearL||nearR) && slowmoGateOk()) slowmoT=GOAL_SLOWMO_MS/1000;
+}
+function isSlowmo(){ return netRole==='guest' ? netSlowmo : slowmoT>0; }   // guest follows the host's streamed flag
 function triggerGoalFx(side){
   if(!players||!ball) return;
   const gx = side==='L' ? FIELD.l : FIELD.r, gy=H/2;        // the goal mouth that was scored in
@@ -2020,16 +2044,22 @@ function loop(ts){
       // thin client: stream input (throttled), render the host's snapshot smoothly,
       // and locally predict our OWN player so controls feel instant
       gInputAcc+=dt; if(gInputAcc>=0.018){ gInputAcc=0; sendGuestInput(); }   // ~55Hz input (snappier control)
-      applyNetState();
-      if(!halftime) predictGuestSelf();   // freeze our own player during the half-time break
+      applyNetState();                    // also reads the host's slow-mo flag -> netSlowmo
+      let runPred=true;                   // mirror the host's frame-pulldown on our own predicted player
+      if(netSlowmo){ slowAcc+=GOAL_SLOWMO_SCALE; if(slowAcc>=1) slowAcc-=1; else runPred=false; } else slowAcc=0;
+      if(!halftime && runPred) predictGuestSelf();   // freeze our own player during the half-time break
       updateHUD();
     } else {
       if(goalLock>0)goalLock--;
       else if(!golden && !halftime){
-        timeLeft-=dt;
+        timeLeft-=dt;                      // match clock stays REAL-TIME — slow-mo never touches it
         if(timeLeft<=0){ timeLeft=0; onTimeUp(); }
       }
-      if(!halftime){                      // freeze the whole pitch during the half-time break
+      maybeArmSlowmo();                    // arm slow-mo as a gated, goal-bound shot enters the zone
+      let runSim=true;                     // frame-pulldown: during slow-mo, advance the sim a FRACTION of frames (visual slow only)
+      if(isSlowmo()){ slowAcc+=GOAL_SLOWMO_SCALE; if(slowAcc>=1) slowAcc-=1; else runSim=false; } else slowAcc=0;
+      if(slowmoT>0) slowmoT-=dt;           // count the slow-mo window down in real time
+      if(!halftime && runSim){             // freeze the pitch during half-time, and on skipped slow-mo frames
         controlPlayer(players.p);
         if(netRole==='host') controlNet(players.t);
         else if(oppActive){ if(mode==='2p')controlPlayer(players.t); else aiControl(players.t); }
@@ -2050,8 +2080,8 @@ function loop(ts){
     if(netRole){ pingAcc+=dt; if(pingAcc>=0.34){ pingAcc=0; NET.relay({ping:performance.now()}); }   // ~3Hz so the adaptive buffer reacts fast
       pingDispAcc+=dt; if(pingDispAcc>=1.0){ pingDispAcc=0; NET.rttShown=NET.rtt; } }   // on-screen ping updates 1Hz (no flicker)
   }
-  // advance the goal juice (visual only, both roles). The slow-mo beat scales the FX clock, NOT the netcode/timers.
-  let fxDt=dt; if(goalFx && goalFx.slowT>0){ goalFx.slowT-=dt; fxDt=dt*GOAL_SLOWMO_SCALE; }
+  // advance the goal juice (visual only, both roles). The slow-mo scales the FX clock too; the match clock stays real-time.
+  let fxDt = isSlowmo() ? dt*GOAL_SLOWMO_SCALE : dt;
   updateGoalFx(fxDt);
   draw();
 }
@@ -3194,7 +3224,7 @@ function sendState(extra){
     p:{x:R(p.x),y:R(p.y),aim:R2(p.aim),face:p.face,char:p.char,stam:R2(p.stamina),ch:R2(p.charge),cg:p.charging?1:0},
     t:{x:R(t.x),y:R(t.y),aim:R2(t.aim),face:t.face,char:t.char,stam:R2(t.stamina),ch:R2(t.charge),cg:t.charging?1:0},
     b:{x:R(ball.x),y:R(ball.y),roll:R2(ball.roll||0),dir:R2(ball.dir||0),net:ball.netSide||0,own:ball.owner||0},
-    s:[score.p,score.t], tl:R1(timeLeft), gl:golden, pp:R1(possP), tp:R1(possT), gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide, gq:goalSeq, gsd:goalFxSide
+    s:[score.p,score.t], tl:R1(timeLeft), gl:golden, pp:R1(possP), tp:R1(possT), gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide, gq:goalSeq, gsd:goalFxSide, sm:slowmoT>0?1:0
   }});
 }
 // guest buffers snapshots and renders in the past, gliding between them.
@@ -3226,6 +3256,7 @@ function applyNetState(){
   if(latest.gm) gameMode=latest.gm; if(latest.pp!=null) possP=latest.pp; if(latest.tp!=null) possT=latest.tp;
   if(latest.rq!=null && latest.rq>rebSeen){ rebSeen=latest.rq; showToast('🎯 REBOUND +3s!', latest.rs==='p'?'#69db7c':'#ff8787'); }
   if(latest.gq!=null && latest.gq>goalSeen){ goalSeen=latest.gq; triggerGoalFx(latest.gsd||'L'); }   // detonate the goal explosion in sync with the host
+  netSlowmo = !!latest.sm;                          // follow the host's slow-mo window (drives our prediction + FX pulldown)
   if(latest.hf){ const wasHt=halftime; half=latest.hf; halftime=!!latest.ht;
     setMeta(halftime?'HALF TIME':halfLabel());
     if(halftime && !wasHt) showHalftime();          // host hit half-time -> show our 5s screen + freeze

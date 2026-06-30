@@ -594,7 +594,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b76 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b77 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -3283,6 +3283,11 @@ function predictGuestSelf(){
   if(held){ t.charging=true; t.charge=Math.min(1, (t.charge||0)+(1/(CHARGE_TIME*60))); }
   else { t.charging=false; t.charge=0; }
 }
+let P2P_DEBUG=true;   // b77 diagnostic: log the WebRTC handshake (ICE states, candidate TYPES, DC open, give-up reason) to the console
+// TURN servers — needed for P2P through SYMMETRIC NAT / CGNAT (common on AU residential NBN + all 4G/5G home internet),
+// which STUN alone CANNOT traverse. EMPTY = STUN-only (current behaviour, unchanged). To enable, paste Cloudflare TURN creds:
+//   const TURN_SERVERS=[{urls:['turn:turn.cloudflare.com:3478?transport=udp','turn:turn.cloudflare.com:3478?transport=tcp','turns:turn.cloudflare.com:5349?transport=tcp'], username:'<TURN key id>', credential:'<TURN token>'}];
+const TURN_SERVERS=[];
 const NET = {
   ws:null, role:null, intentionalClose:false, reconnTries:0,
   connect(then){
@@ -3327,23 +3332,34 @@ const NET = {
   p2pStart(initiator){
     if(typeof RTCPeerConnection==='undefined' || this.pc) return;   // unsupported, or already negotiating
     let pc; try{ pc=new RTCPeerConnection({iceServers:[
-      // multiple STUN providers -> higher direct-P2P success (if one is blocked/slow in a region, another wins).
-      // NOTE: STUN only finds a direct path; symmetric/CGNAT NATs still need a TURN server (not yet configured) and
-      // fall back to relaying game traffic over the WS lobby — see p2pDown(). Add TURN here when a provider is set up.
+      // multiple STUN providers -> higher direct-P2P success. STUN finds a direct path through CONE NATs only;
+      // SYMMETRIC NAT / CGNAT needs TURN (TURN_SERVERS above) — until then those peers fall back to the WS relay.
       {urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun2.l.google.com:19302']},
-      {urls:'stun:stun.cloudflare.com:3478'}]}); }catch(e){ return; }
+      {urls:'stun:stun.cloudflare.com:3478'},
+      ...TURN_SERVERS]}); }catch(e){ return; }
     this.pc=pc; this.remoteSet=false; this.candQ=[];
-    pc.onicecandidate=e=>{ if(e.candidate) this.signal({c:e.candidate}); };
-    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(s==='failed'||s==='disconnected') this.p2pDown(); };
+    pc._cand={host:0,srflx:0,relay:0,other:0};                 // diagnostic: which ICE candidate TYPES we gather
+    pc.onicecandidate=e=>{ if(e.candidate){
+        const ty=(/ typ (\w+)/.exec(e.candidate.candidate||'')||[])[1]||'other'; pc._cand[ty]=(pc._cand[ty]||0)+1;
+        if(P2P_DEBUG) console.log('[p2p] local candidate typ '+ty);
+        this.signal({c:e.candidate});
+      } else if(P2P_DEBUG){ console.log('[p2p] ICE gathering complete — local candidates '+JSON.stringify(pc._cand)); } };
+    pc.oniceconnectionstatechange=()=>{ if(P2P_DEBUG) console.log('[p2p] iceConnectionState: '+pc.iceConnectionState); };
+    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(P2P_DEBUG) console.log('[p2p] connectionState: '+s); if(s==='failed'||s==='disconnected') this.p2pDown(); };
     const wire=dc=>{ this.dc=dc;
-      dc.onopen=()=>{ this.p2p=true; NET.rtt=null; showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
+      dc.onopen=()=>{ this.p2p=true; NET.rtt=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — direct P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
       dc.onclose=()=>this.p2pDown();
       dc.onmessage=ev=>{ let d; try{d=JSON.parse(ev.data);}catch(_){return;} onRelayData(d); };
     };
     if(initiator){ wire(pc.createDataChannel('game',{ordered:false,maxRetransmits:0}));
-      pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>this.signal({o:pc.localDescription})).catch(()=>{}); }
+      pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>this.signal({o:pc.localDescription})).catch(e=>{ if(P2P_DEBUG) console.warn('[p2p] offer error',e); }); }
     else { pc.ondatachannel=e=>wire(e.channel); }
-    setTimeout(()=>{ if(!this.p2p && this.pc===pc){ try{pc.close();}catch(_){}}}, 10000);   // 10s to connect, else stay on relay
+    setTimeout(()=>{ if(!this.p2p && this.pc===pc){          // 10s to connect, else stay on relay
+        if(P2P_DEBUG){ const c=pc._cand||{}, why = TURN_SERVERS.length ? 'TURN configured but still no working path (check creds/expiry)'
+            : (c.srflx ? 'srflx gathered but NO working pair -> a peer is behind SYMMETRIC NAT / CGNAT -> needs TURN' : 'NO srflx candidate -> STUN unreachable/blocked on this network');
+          console.warn('[p2p] NO direct connection after 10s — staying on WS relay. iceState='+pc.iceConnectionState+'  localCandidates='+JSON.stringify(c)+'  | '+why);
+          showToast('No direct P2P — relay mode ('+(c.srflx?'NAT needs TURN':'STUN blocked')+')','#ffd43b'); }
+        try{pc.close();}catch(_){} } }, 10000);
   },
   p2pHandle(rtc){
     if(!this.pc){ if(rtc.o) this.p2pStart(false); else return; }   // offer arrived first → spin up as the answerer
@@ -3351,7 +3367,8 @@ const NET = {
     if(rtc.o){ pc.setRemoteDescription(rtc.o).then(()=>{ this.remoteSet=true; this.drainCand(); return pc.createAnswer(); })
         .then(a=>pc.setLocalDescription(a)).then(()=>this.signal({a:pc.localDescription})).catch(()=>{}); }
     else if(rtc.a){ pc.setRemoteDescription(rtc.a).then(()=>{ this.remoteSet=true; this.drainCand(); }).catch(()=>{}); }
-    else if(rtc.c){ if(this.remoteSet) pc.addIceCandidate(rtc.c).catch(()=>{}); else this.candQ.push(rtc.c); }
+    else if(rtc.c){ if(P2P_DEBUG){ const ty=(/ typ (\w+)/.exec((rtc.c&&rtc.c.candidate)||'')||[])[1]||'?'; console.log('[p2p] remote candidate typ '+ty); }
+      if(this.remoteSet) pc.addIceCandidate(rtc.c).catch(()=>{}); else this.candQ.push(rtc.c); }
   },
   drainCand(){ for(const c of this.candQ){ try{ this.pc.addIceCandidate(c).catch(()=>{}); }catch(_){} } this.candQ=[]; },
   p2pDown(){ if(this.dc){ try{this.dc.close();}catch(_){}} this.dc=null;

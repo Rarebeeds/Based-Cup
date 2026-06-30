@@ -594,7 +594,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b81 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b82 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -3373,20 +3373,21 @@ const NET = {
         this._discT=setTimeout(()=>{ if(this.pc===pc && pc.connectionState!=='connected') this.p2pDown(); }, 6000); }
       else if(s==='connected'){ clearTimeout(this._discT); } };
     const wire=dc=>{ this.dc=dc;
-      // b81: KEEP the P2P channel whatever the path. A Cloudflare-TURN (UDP) path — even srflx/relay or relay/relay —
-      // routes through Cloudflare's fast anycast edge and beats the single shared Fly WS relay; the b79 'decline relay'
-      // policy was wrong (it sent relay-only peers back to the slow Fly box). Direct (host/srflx) is still best and ICE
-      // prefers it by priority; we just no longer throw away a working relayed path. (b79's disconnect-grace stays.)
-      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; NET.rttDisp=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — P2P established'); showToast('⚡ P2P connected — lower ping','#69db7c'); };
-      dc.onopen=()=>{ keepP2P();
-        if(P2P_DEBUG) try{ pc.getStats().then(st=>{            // log-only: which path ICE selected (direct vs Cloudflare relay)
+      // FINAL P2P policy (b82): keep P2P ONLY for a truly DIRECT pair (host/srflx ↔ host/srflx) — that's the only path
+      // that actually lowers ping, and ICE picks it automatically when both peers are cone-NAT. For a RELAYED pair we
+      // stay on the user's region-selected Fly WS relay: Cloudflare's TURN anycast can allocate a FAR edge (measured
+      // 450ms > the Sydney Fly relay's 300), so for relay-only matchups the region relay is the safer/faster choice.
+      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; NET.rttDisp=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — DIRECT P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
+      dc.onopen=()=>{ try{ pc.getStats().then(st=>{
             let selId=null; st.forEach(r=>{ if(r.type==='transport' && r.selectedCandidatePairId) selId=r.selectedCandidatePairId; });
             let pair=selId?st.get(selId):null;
             if(!pair) st.forEach(r=>{ if(r.type==='candidate-pair' && r.nominated && r.state==='succeeded') pair=r; });
             const loc=pair&&st.get(pair.localCandidateId), rem=pair&&st.get(pair.remoteCandidateId);
             const relayed=(loc&&loc.candidateType==='relay')||(rem&&rem.candidateType==='relay');
-            console.log('[p2p] selected pair '+((loc&&loc.candidateType)||'?')+'/'+((rem&&rem.candidateType)||'?')+(relayed?' — via Cloudflare TURN (UDP), KEPT (beats the WS relay)':' — DIRECT'));
-          }).catch(()=>{}); }catch(_){} };
+            if(P2P_DEBUG) console.log('[p2p] selected pair '+((loc&&loc.candidateType)||'?')+'/'+((rem&&rem.candidateType)||'?'));
+            if(relayed){ if(P2P_DEBUG) console.log('[p2p] relayed (Cloudflare TURN) path — staying on the region WS relay (more predictable for relay-only peers)'); this.p2pDown(); }
+            else keepP2P();
+          }).catch(keepP2P); }catch(_){ keepP2P(); } };
       dc.onclose=()=>this.p2pDown();
       dc.onmessage=ev=>{ let d; try{d=JSON.parse(ev.data);}catch(_){return;} onRelayData(d); };
     };

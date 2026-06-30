@@ -2206,7 +2206,7 @@ function predictGuestSelf(){
   if(held){ t.charging=true; t.charge=Math.min(1, (t.charge||0)+(1/(CHARGE_TIME*60))); }
   else { t.charging=false; t.charge=0; }
 }
-let P2P_DEBUG=true;   // b77 diagnostic: log the WebRTC handshake (ICE states, candidate TYPES, DC open, give-up reason) to the console
+let P2P_DEBUG=false;   // b83: OFF for production (TURN confirmed working b78-b82). true = log the WebRTC handshake (ICE states, candidate TYPES, DC open, give-up reason) + the give-up verdict toast — for diagnostics only.
 // TURN servers for P2P through SYMMETRIC NAT / CGNAT (AU residential NBN + all 4G/5G home internet) — STUN can't traverse those.
 // AUTO-LOADED at match time from /api/turn (Cloudflare TURN, short-lived creds minted server-side; the key secret never
 // ships to the browser). EMPTY = STUN-only fallback (e.g. /api/turn not configured yet) — never breaks. To turn it ON, set

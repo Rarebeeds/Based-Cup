@@ -16,7 +16,8 @@ export default async function handler(req, res) {
 
   const keyId = process.env.TURN_KEY_ID;
   const token = process.env.TURN_KEY_API_TOKEN;
-  if (!keyId || !token) return res.status(200).json({ iceServers: null, note: 'TURN not configured' });
+  // diagnostic: report PRESENCE of each env var (never the values) so misconfig is easy to pinpoint
+  if (!keyId || !token) return res.status(200).json({ iceServers: null, note: 'TURN not configured', hasId: !!keyId, hasToken: !!token });
 
   try {
     const r = await fetch(

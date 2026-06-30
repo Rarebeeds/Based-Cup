@@ -99,6 +99,22 @@ const STATS={
   chad:   {name:'CHAD',    abbr:'CHD', onball:7, offball:6, power:9,  defense:4,  dribble:5, stamina:5}
 };
 function paceOf(c){ const s=STATS[c]; return s.onball+s.offball; }   // derived display value, not assigned
+// ---- Locker roster meta. NOT stat data (stats come ONLY from STATS — single source of truth). ----
+// `arch` = archetype label (per BASED_CUP_STAT_DESIGN.md). `owned` is the collection-ready seam:
+// true for everyone now; the carousel reads isOwned() per character so cosmetic rarity / packs can
+// slot in later WITHOUT re-architecting. Order = carousel order (pace-leaning → wall).
+const ROSTER=['pepe','elon','pdidpe','obampe','chad','wojak','okeyjak','sadjak','doomer','boomer','soyjak','trumpe','grandpa','oldwoj'];
+const CHAR_META={
+  pepe:{arch:'Speedster-Dribbler'}, elon:{arch:'Speedster'},     pdidpe:{arch:'Dribbler'},
+  obampe:{arch:'All-Rounder'},      chad:{arch:'Power-Pace'},    wojak:{arch:'All-Rounder'},
+  okeyjak:{arch:'All-Rounder'},     sadjak:{arch:'All-Rounder'}, doomer:{arch:'Powerhouse'},
+  boomer:{arch:'Wall'},             soyjak:{arch:'Power-Defense'},trumpe:{arch:'Powerhouse'},
+  grandpa:{arch:'Wall'},            oldwoj:{arch:'Def. Powerhouse'}
+};
+function archetypeOf(c){ return (CHAR_META[c]&&CHAR_META[c].arch)||'All-Rounder'; }
+function isOwned(c){ return true; }   // collection seam — all owned for now; locker honours this per character
+let equippedChar='pepe';   // the ACTIVE character chosen in the Locker; every match flow uses it (set via setEquipped)
+let _equipSynced=false;    // one-shot guard for the cross-device equipped pull
 // stat -> movement-speed mapping (b56): widened from the old 4.2 + stat*0.16 (floor dominated, ~6% felt gap).
 // Lower floor + ~3x slope so on/off and char-to-char pace are clearly FELT (arcadey). Pivots ~stat 6 ≈ old mid-pace.
 const SPEED_FLOOR=2.1, SPEED_SLOPE=0.50;
@@ -1369,6 +1385,8 @@ function refreshAcctBtn(){
   if(cc){ if(account.guest){ cc.classList.add('hide'); } else { cc.innerHTML=coinIcon()+myCoins(); cc.classList.remove('hide'); } }
   $('acctBtn').classList.remove('hide'); $('bellBtn').classList.remove('hide');
   refreshGuestBanner();
+  loadEquipped();                                            // per-account equipped character (local)
+  if(sbUser && !_equipSynced){ _equipSynced=true; syncEquippedFromCloud(); }   // one-shot cross-device pull
 }
 
 // ---- $BASED coins (in-game currency; mirrored to Supabase profiles) ----
@@ -1891,10 +1909,10 @@ $('wsBackBtn').onclick=()=>{ $('wagerSelectScreen').classList.add('hide'); $('mo
 document.querySelectorAll('#wagerSelectScreen .wsAmt').forEach(b=>{
   b.onclick=()=>{ const amt=parseInt(b.getAttribute('data-amt'),10)||0;
     if(amt>myCoins()){ $('wsErr').innerHTML='Not enough $BASED — you have '+coinIcon()+myCoins()+'.'; return; }
-    stakeSel=amt;                                    // stake locked in; character select is next
+    stakeSel=amt;                                    // stake locked in
     $('wagerSelectScreen').classList.add('hide');
-    openSelect('wager'); }; });
-$('msQuickBtn').onclick=()=>openSelect('quick');   // matchmake, friendly (no wager)
+    loadEquipped(); humanChar=equippedChar; gameMode='goals'; csContext='wager'; startQuickMatch(); }; });   // BUILD 1: equipped char, queue straight in
+$('msQuickBtn').onclick=()=>{ stakeSel=0; loadEquipped(); humanChar=equippedChar; gameMode='goals'; csContext='quick'; startQuickMatch(); };   // BUILD 1: equipped char, no picker
 $('msFriendBtn').onclick=()=>openOnlineLobby();    // private friend lobby (no wager)
 
 // ---- STORE (currency top-ups — placeholder, no marketplace yet) ----
@@ -1941,6 +1959,83 @@ seg('oppSeg','data-opp',v=>{ practiceOpp=v;
   $('oppDiffRow').style.display = v==='cpu'?'flex':'none'; });
 seg('oppDiffSeg','data-diff',v=>diff=v);
 
+// ===== LOCKER — equip persistence + per-character record store + holographic carousel =====
+function equipKey(){ return 'sh_equip_'+(((account&&account.username)||'guest')+'').toLowerCase(); }
+function loadEquipped(){ const c=DB.get(equipKey()); equippedChar=(c&&STATS[c]&&isOwned(c))?c:'pepe'; humanChar=equippedChar; updateLockerBtn(); return equippedChar; }
+function setEquipped(c){ if(!STATS[c]||!isOwned(c)) return; equippedChar=c; humanChar=c;
+  DB.set(equipKey(), c);
+  if(sb && sbUser){ try{ sb.from('profiles').update({equipped:c}).eq('id',sbUser.id); }catch(_){} }   // best-effort cross-device mirror (needs the 'equipped' column)
+  updateLockerBtn(); }
+// pull the cloud profile's equipped char (cross-device). Guarded: if the column doesn't exist yet
+// (SQL not run) the catch swallows it and local stays the source of truth — never breaks sign-in.
+async function syncEquippedFromCloud(){ if(!sb||!sbUser) return;
+  try{ const {data}=await sb.from('profiles').select('equipped').eq('id',sbUser.id).single();
+    if(data && data.equipped && STATS[data.equipped]){ DB.set(equipKey(), data.equipped); loadEquipped(); } }catch(_){} }
+function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=STATS[equippedChar]?STATS[equippedChar].name:'your character'; }
+
+// per-character RECORD store — BUILD 2 populates this. Local now (cloud-mirrorable later). Returns
+// safe zeros so the card BACK renders cleanly with no data yet.
+function charRecordAll(){ try{ return JSON.parse(DB.get('sh_crec_'+(((account&&account.username)||'guest')+'').toLowerCase())||'{}'); }catch(_){ return {}; } }
+function getCharRecord(c){ const r=charRecordAll()[c]||{};
+  return { wins:r.wins||0, losses:r.losses||0, gf:r.gf||0, ga:r.ga||0, og:r.og||0,
+           dribbleOk:r.dribbleOk||0, dribbleTry:r.dribbleTry||0, tackleOk:r.tackleOk||0, tackleTry:r.tackleTry||0 }; }
+function recPct(ok,tot){ return tot>0 ? Math.round(ok/tot*100)+'%' : '—'; }
+
+let loIdx=0, loBuilt=false;
+function lockerFrontHTML(c){ const s=STATS[c];
+  const bar=(lbl,v)=>'<div class="loStat"><span class="ll">'+lbl+'</span><span class="lb"><b style="width:'+(v*10)+'%"></b></span><span class="lv">'+v+'</span></div>';
+  return '<div class="loFace loFront"><div class="loEquipBadge">✓ EQUIPPED</div>'
+    + '<div class="loHead"><div class="loRating"><b>'+paceOf(c)+'</b><span>PACE</span></div><div class="loArchChip">'+archetypeOf(c)+'</div></div>'
+    + '<div class="loArt"><img alt="" src="'+imgFor(c).src+'"></div>'
+    + '<div class="loName">'+s.name+'</div>'
+    + '<div class="loStatGrid">'+bar('ON',s.onball)+bar('OFF',s.offball)+bar('POW',s.power)+bar('DEF',s.defense)+bar('DRI',s.dribble)+bar('STA',s.stamina)+'</div></div>'; }
+function lockerBackHTML(c){ const s=STATS[c], r=getCharRecord(c);
+  const row=(lbl,val)=>'<div class="loRec"><span>'+lbl+'</span><b>'+val+'</b></div>';
+  return '<div class="loFace loBackFace"><div class="loBackHead"><b>'+s.name+'</b><span>YOUR RECORD</span></div>'
+    + '<div class="loRecGrid">'+row('Wins',r.wins)+row('Losses',r.losses)+row('Goals scored',r.gf)+row('Goals conceded',r.ga)
+    + row('Own goals',r.og)+row('Dribble success',recPct(r.dribbleOk,r.dribbleTry))+row('Tackle success',recPct(r.tackleOk,r.tackleTry))
+    + '</div><div class="loBackNote">Tracked from your matches — fills in as you play.</div></div>'; }
+function buildLockerCards(){ const track=$('loTrack'); if(!track) return; track.innerHTML='';
+  ROSTER.forEach((c,i)=>{ const slot=document.createElement('div'); slot.className='loSlot'+(isOwned(c)?'':' locked');
+    slot.setAttribute('data-i',i); slot.setAttribute('data-char',c);
+    slot.innerHTML='<div class="loLock">🔒</div><div class="loFlip">'+lockerFrontHTML(c)+lockerBackHTML(c)+'</div>';
+    track.appendChild(slot); });
+  const dots=$('loDots'); if(dots){ dots.innerHTML=''; ROSTER.forEach((c,i)=>{ const d=document.createElement('div'); d.className='loDot';
+    d.onclick=()=>gotoLocker(i); dots.appendChild(d); }); }
+  loBuilt=true; }
+function positionLocker(){ const slots=$('loTrack').children;
+  for(let i=0;i<slots.length;i++){ const off=i-loIdx, a=Math.abs(off), s=slots[i]; let tx,sc,op,ry,z;
+    if(a===0){ tx=0; sc=1; op=1; ry=0; z=30; }
+    else if(a===1){ tx=off*62; sc=.82; op=.6; ry=off*-16; z=20; }
+    else if(a===2){ tx=(off>0?112:-112); sc=.66; op=.18; ry=off*-22; z=10; }
+    else { tx=(off>0?130:-130); sc=.6; op=0; ry=0; z=1; }
+    s.style.transform='translateX('+tx+'%) scale('+sc+') rotateY('+ry+'deg)';
+    s.style.opacity=op; s.style.zIndex=z; s.style.pointerEvents=op>0?'auto':'none';
+    s.classList.toggle('active', a===0); if(a!==0) s.classList.remove('flip');   // only the centred card flips
+    s.classList.toggle('equipped', ROSTER[i]===equippedChar); }
+  const dots=$('loDots'); if(dots) for(let i=0;i<dots.children.length;i++) dots.children[i].classList.toggle('on', i===loIdx);
+  const eq=$('loEquipBtn'); if(eq){ const cur=ROSTER[loIdx];
+    if(cur===equippedChar){ eq.textContent='✓ EQUIPPED'; eq.classList.add('isEquipped'); }
+    else { eq.textContent='EQUIP '+STATS[cur].name; eq.classList.remove('isEquipped'); } } }
+function gotoLocker(i){ loIdx=Math.max(0,Math.min(ROSTER.length-1,i));
+  const slots=$('loTrack').children; for(let k=0;k<slots.length;k++) slots[k].classList.remove('flip'); positionLocker(); }
+function flipActiveCard(){ const s=$('loTrack').children[loIdx]; if(s) s.classList.toggle('flip'); }
+function openLocker(){ hideAllOverlays(); loadEquipped(); buildLockerCards();
+  loIdx=Math.max(0,ROSTER.indexOf(equippedChar)); positionLocker(); $('lockerScreen').classList.remove('hide'); }
+function closeLocker(){ $('lockerScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); }
+$('lockerBtn').onclick=()=>{ audioInit(); openLocker(); };
+$('lockerBackBtn').onclick=closeLocker;
+$('loPrev').onclick=()=>gotoLocker(loIdx-1);
+$('loNext').onclick=()=>gotoLocker(loIdx+1);
+$('loEquipBtn').onclick=()=>{ const c=ROSTER[loIdx]; if(!isOwned(c)) return; setEquipped(c); positionLocker(); showToast('✓ '+STATS[c].name+' equipped','#10a35a'); };
+(function(){ const stage=$('loStage'); if(!stage) return; let down=false,sx=0,sy=0,moved=false,onCard=null;
+  stage.addEventListener('pointerdown',e=>{ if(e.target.closest('.loArrow')) return; down=true; moved=false; sx=e.clientX; sy=e.clientY; onCard=e.target.closest('.loSlot'); });
+  stage.addEventListener('pointermove',e=>{ if(down && (Math.abs(e.clientX-sx)>8||Math.abs(e.clientY-sy)>8)) moved=true; });
+  stage.addEventListener('pointerup',e=>{ if(!down) return; down=false; const dx=e.clientX-sx;
+    if(moved && Math.abs(dx)>34){ gotoLocker(loIdx+(dx<0?1:-1)); return; }
+    if(!moved && onCard){ const i=+onCard.getAttribute('data-i'); if(i===loIdx) flipActiveCard(); else gotoLocker(i); } });
+  stage.addEventListener('pointercancel',()=>{ down=false; }); })();
+
 function openSelect(ctx){
   csContext=ctx;
   hideAllOverlays();
@@ -1951,6 +2046,10 @@ function openSelect(ctx){
     : ctx==='host' ? 'YOUR LOBBY — CHOOSE CHARACTER (friend gets the other)'
     : 'PRACTICE — CHOOSE CHARACTER';
   charIdx=0; paintCharCards();
+  // BUILD 1: character is chosen in the LOCKER now — hide the old in-flow picker, show the equipped readout.
+  loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
+  if($('charCarousel')) $('charCarousel').style.display='none';
+  if($('charHint')) $('charHint').innerHTML='Playing as <b>'+STATS[equippedChar].name+'</b> — change in the Locker';
   gameMode='goals';
   document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-mode')==='goals'));
   if($('modeHint')) $('modeHint').textContent='First to most goals in 60s.';
@@ -1963,8 +2062,8 @@ $('selBackBtn').onclick=()=>{ $('selectScreen').classList.add('hide'); $('startS
 seg('modeSeg','data-mode', m=>{ gameMode=m;
   if($('modeHint')) $('modeHint').textContent = m==='keepaway' ? 'Hold the ball longest in one 1:30 round — no half-time.' : 'First to most goals over two 1:00 halves.'; });
 $('selStartBtn').onclick=()=>{
-  humanChar=selChar;
-  if(csContext==='host'){                       // online host picked character -> start the match
+  humanChar=equippedChar;                        // BUILD 1: always the locker-equipped character
+  if(csContext==='host'){                       // online host -> start the match
     sendHostStart();
     beginGameOnline('host');
     return;
@@ -2326,9 +2425,8 @@ function setupGuestWager(start){
   let amount = Math.max(0, Math.min(hostStake, myStake));
   if(!onlineWagerEnabled() || !sbUser || !hostId || amount>myCoins()) amount=0;
   const myId = (sbUser && account && !account.guest) ? sbUser.id : null;  // guests stay casual
-  // our character: quick-match guests picked one; friend guests (no select screen) take the opposite.
-  const hostChar = start.hostChar || 'pepe';
-  const guestChar = (onlineKind==='quick') ? selChar : (hostChar==='pepe'?'trumpe':'pepe');
+  // BUILD 1: the guest always plays its own LOCKER-equipped character (quick, wager AND friend).
+  const guestChar = (STATS[equippedChar] ? equippedChar : 'pepe');
   oppChar = guestChar;   // we (guest) control players.t = guestChar; players.p = host's char
   wager = { amount, oppId:hostId, matchId:start.matchId||null, settled:false };
   NET.relay({ wagerAck:{ amount, stake:myStake, guestId:myId, char:guestChar } });   // tell host our character
@@ -2369,7 +2467,7 @@ function _beginGameOnline(role){
   netKickPrev=false; NET.state=null; NET.buf=[]; stateSendAcc=0; gInputAcc=0;
   NET.guestInput={ax:0,ay:0,aim:Math.PI,sprint:false,kick:false};
   recordOpponent(NET.peerName);
-  ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','onlineScreen','profileScreen','inboxScreen']
+  ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','onlineScreen','profileScreen','inboxScreen','lockerScreen']
     .forEach(s=>$(s).classList.add('hide'));
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
   $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide'); setMenuDocks(false); $('pCard').classList.remove('hide'); $('tCard').classList.remove('hide');
@@ -2892,7 +2990,7 @@ addEventListener('resize', checkOrient);
 addEventListener('orientationchange', ()=>setTimeout(checkOrient,150));
 function beginGame(){ oppChar=null; showLoadingThen(_beginGame); }   // practice/local: opponent is the opposite character
 function _beginGame(){
-  ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','profileScreen','inboxScreen']
+  ['authScreen','startScreen','winScreen','pauseScreen','matchScreen','selectScreen','socialScreen','boardScreen','profileScreen','inboxScreen','lockerScreen']
     .forEach(s=>$(s).classList.add('hide'));
   $('acctBtn').classList.add('hide'); $('bellBtn').classList.add('hide');
   $('hud').classList.remove('hide'); $('liveCountHud').classList.remove('hide'); setMenuDocks(false);

@@ -52,6 +52,10 @@ language sql stable as $$
   where lower(username) = lower(p_username);
 $$;
 
+-- ====== Locker: equipped character (b70) — OPTIONAL (local persistence works without it;
+-- this enables cross-device equip). Run once: ======
+alter table profiles add column if not exists equipped text;
+
 -- ====== Hourly + All-Time leaderboards (b69) ======
 -- Both read the SAME match_results table. HOURLY filters to the current Brisbane/AEST
 -- clock hour (UTC+10, no DST) and HARD-RESETS at the top of each hour because the

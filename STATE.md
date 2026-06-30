@@ -2,6 +2,8 @@
 
 Read **CLAUDE.md** first (laws/build/deploy). Deep internals are in **PROJECT_BRIEF.md**. This file = current state only.
 
+> **▶ NEXT (handoff @ b84):** user to **test b84 guest smoothness** in a real online match — if still choppy, nudge the named tunables (`INTERP_FLOOR`↑ for more buffer, `RENDER_EASE`) — no re-diagnosis needed (see b84 log). **Do NOT re-chase the online ping in code** — the ~300ms relay floor is a *network-side* limit (their two machines are symmetric-NAT/CGNAT; sub-80 needs a direct connection: off-CGNAT / hotspot / UPnP), not a bug (see b82). TURN is wired + live (Vercel env vars `TURN_KEY_ID`+`TURN_KEY_API_TOKEN`); `P2P_DEBUG=false` (flip true to re-diagnose P2P).
+
 > ## ⚠️ END-OF-SESSION RULE — update BEFORE you wrap (this is what stops cross-session drift)
 > At every clean stopping point and always before ending a session, update this file:
 > 1. **Current build number** (the `## Current build:` line below) — match the badge you bumped in `game_template.html`.

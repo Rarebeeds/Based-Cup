@@ -594,7 +594,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b80 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b81 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -3349,8 +3349,10 @@ const NET = {
   // ---- WebRTC P2P: an optional accelerator layered on top; the WS relay is always the fallback ----
   dc:null, pc:null, p2p:false, remoteSet:false, candQ:[],
   signal(rtc){ this.send({t:'relay', d:{rtc}}); },          // signalling always rides the WS relay
-  p2pStart(initiator){
+  async p2pStart(initiator){
     if(typeof RTCPeerConnection==='undefined' || this.pc) return;   // unsupported, or already negotiating
+    await loadTurn();          // b81: TURN creds MUST be in the iceServers before we gather, else a symmetric peer gets relay:0
+    if(this.pc) return;        // another p2pStart created the pc during the await
     let pc; try{ pc=new RTCPeerConnection({iceServers:[
       // multiple STUN providers -> higher direct-P2P success. STUN finds a direct path through CONE NATs only;
       // SYMMETRIC NAT / CGNAT needs TURN (TURN_SERVERS above) — until then those peers fall back to the WS relay.
@@ -3371,20 +3373,20 @@ const NET = {
         this._discT=setTimeout(()=>{ if(this.pc===pc && pc.connectionState!=='connected') this.p2pDown(); }, 6000); }
       else if(s==='connected'){ clearTimeout(this._discT); } };
     const wire=dc=>{ this.dc=dc;
-      // KEEP the P2P channel only if the selected ICE pair is DIRECT (host/srflx). A TURN-RELAYED pair just
-      // bounces through Cloudflare and was measured worse + flappier than the (Sydney) WS relay — so relay-only
-      // peers stay on the WS relay; cone-NAT peers get the real direct ⚡ win. (Prefer-direct policy, b79.)
-      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; NET.rttDisp=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — DIRECT P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
-      dc.onopen=()=>{ try{ pc.getStats().then(st=>{
+      // b81: KEEP the P2P channel whatever the path. A Cloudflare-TURN (UDP) path — even srflx/relay or relay/relay —
+      // routes through Cloudflare's fast anycast edge and beats the single shared Fly WS relay; the b79 'decline relay'
+      // policy was wrong (it sent relay-only peers back to the slow Fly box). Direct (host/srflx) is still best and ICE
+      // prefers it by priority; we just no longer throw away a working relayed path. (b79's disconnect-grace stays.)
+      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; NET.rttDisp=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — P2P established'); showToast('⚡ P2P connected — lower ping','#69db7c'); };
+      dc.onopen=()=>{ keepP2P();
+        if(P2P_DEBUG) try{ pc.getStats().then(st=>{            // log-only: which path ICE selected (direct vs Cloudflare relay)
             let selId=null; st.forEach(r=>{ if(r.type==='transport' && r.selectedCandidatePairId) selId=r.selectedCandidatePairId; });
             let pair=selId?st.get(selId):null;
             if(!pair) st.forEach(r=>{ if(r.type==='candidate-pair' && r.nominated && r.state==='succeeded') pair=r; });
             const loc=pair&&st.get(pair.localCandidateId), rem=pair&&st.get(pair.remoteCandidateId);
             const relayed=(loc&&loc.candidateType==='relay')||(rem&&rem.candidateType==='relay');
-            if(P2P_DEBUG) console.log('[p2p] selected pair '+((loc&&loc.candidateType)||'?')+'/'+((rem&&rem.candidateType)||'?'));
-            if(relayed){ if(P2P_DEBUG) console.log('[p2p] P2P is TURN-RELAYED (not direct) → staying on the closer WS relay'); this.p2pDown(); }
-            else keepP2P();
-          }).catch(keepP2P); }catch(_){ keepP2P(); } };
+            console.log('[p2p] selected pair '+((loc&&loc.candidateType)||'?')+'/'+((rem&&rem.candidateType)||'?')+(relayed?' — via Cloudflare TURN (UDP), KEPT (beats the WS relay)':' — DIRECT'));
+          }).catch(()=>{}); }catch(_){} };
       dc.onclose=()=>this.p2pDown();
       dc.onmessage=ev=>{ let d; try{d=JSON.parse(ev.data);}catch(_){return;} onRelayData(d); };
     };
@@ -3398,9 +3400,9 @@ const NET = {
           showToast('No direct P2P — relay mode ('+(c.srflx?'NAT needs TURN':'STUN blocked')+')','#ffd43b'); }
         try{pc.close();}catch(_){} } }, 10000);
   },
-  p2pHandle(rtc){
-    if(!this.pc){ if(rtc.o) this.p2pStart(false); else return; }   // offer arrived first → spin up as the answerer
-    const pc=this.pc;
+  async p2pHandle(rtc){
+    if(!this.pc){ if(rtc.o) await this.p2pStart(false); else return; }   // offer arrived first → spin up as the answerer (await: TURN loads first)
+    const pc=this.pc; if(!pc) return;
     if(rtc.o){ pc.setRemoteDescription(rtc.o).then(()=>{ this.remoteSet=true; this.drainCand(); return pc.createAnswer(); })
         .then(a=>pc.setLocalDescription(a)).then(()=>this.signal({a:pc.localDescription})).catch(()=>{}); }
     else if(rtc.a){ pc.setRemoteDescription(rtc.a).then(()=>{ this.remoteSet=true; this.drainCand(); }).catch(()=>{}); }

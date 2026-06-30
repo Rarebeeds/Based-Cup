@@ -2759,6 +2759,18 @@ function showLoadingThen(fn){
 }
 // ---- one-time session intro: terminal-typed text, then the black curtain rises to reveal an
 // image for ~0.5s before continuing. Only fires on the FIRST START press of the session. ----
+// position the swinging-door overlay on the PAINTED door via the image's object-fit:cover mapping,
+// so it lines up on ANY screen aspect. INTRO_DOOR = the door's location as fractions of the 1600x900 image.
+const INTRO_IMG_W=1600, INTRO_IMG_H=900, INTRO_DOOR={cx:0.490, cy:0.724, w:0.135, h:0.356};  // measured from the red-outlined door
+function layoutIntroDoors(){
+  const rev=$('introReveal'), dr=$('introDoors'); if(!rev||!dr) return;
+  const VW=rev.clientWidth||innerWidth, VH=rev.clientHeight||innerHeight;
+  const s=Math.max(VW/INTRO_IMG_W, VH/INTRO_IMG_H);          // object-fit:cover scale
+  const rw=INTRO_IMG_W*s, rh=INTRO_IMG_H*s, ox=(VW-rw)/2, oy=(VH-rh)/2;
+  const dcx=ox+INTRO_DOOR.cx*rw, dcy=oy+INTRO_DOOR.cy*rh;    // door centre in viewport px
+  dr.style.left=dcx+'px'; dr.style.top=dcy+'px'; dr.style.width=(INTRO_DOOR.w*rw)+'px'; dr.style.height=(INTRO_DOOR.h*rh)+'px';
+  rev.style.transformOrigin=(dcx/VW*100).toFixed(2)+'% '+(dcy/VH*100).toFixed(2)+'%';   // the dive zooms into the door
+}
 let introPlayed=false;
 function showIntroLoading(fn){
   const ov=$('loadingScreen'), rev=$('introReveal'), lt=$('loadText'), pe=$('loadPepe');
@@ -2767,6 +2779,7 @@ function showIntroLoading(fn){
   if(introPlayed || !ov || !lt || !haveImg){ showLoadingThen(fn); return; }
   introPlayed=true;
   rev.classList.remove('hide');                 // image waits behind the black panel
+  layoutIntroDoors(); addEventListener('resize', layoutIntroDoors);   // align the door overlay to the image (any aspect)
   ov.classList.remove('hide','rise'); ov.classList.add('intro');
   ov.style.transform='';
   if(pe) pe.style.display='none';               // pure terminal look during the intro
@@ -2780,7 +2793,8 @@ function showIntroLoading(fn){
     clearTimeout(_loadTimer); clearTimeout(_introSafety);
     ov.removeEventListener('pointerdown',finish);
     ov.classList.add('hide'); ov.classList.remove('intro','rise','bagoff'); ov.style.transform='';
-    if(rev){ rev.classList.add('hide'); rev.classList.remove('lit','dive','opening'); }
+    if(rev){ rev.classList.add('hide'); rev.classList.remove('lit','dive','opening'); rev.style.transformOrigin=''; }
+    removeEventListener('resize', layoutIntroDoors);
     const bl=$('introBlack'); if(bl) bl.classList.remove('on');     // clean return — never leave it stuck zoomed/dark
     if(pe) pe.style.display='';
     lt.classList.remove('typing');

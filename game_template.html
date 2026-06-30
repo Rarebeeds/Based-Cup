@@ -350,17 +350,28 @@
   /* loading screen ("Bringing Goy into the system") */
   /* --- cinematic intro: SEE the building -> its doorway opens to the dark -> you're pulled inside --- */
   #introReveal{position:absolute;inset:0;z-index:199;background:#000;overflow:hidden;
-    --dx:50%;--dy:67%;--dw:13%;--dh:38%;                       /* the building's DOORWAY (% of screen) — TUNE to the image */
+    --dx:50%;--dy:72%;--dw:17%;--dh:30%;                       /* the rectangular DOORS, below the black lintel (% of screen) — TUNE */
     transform-origin:var(--dx) var(--dy);transition:transform .72s cubic-bezier(.5,0,.28,1)}
   #introReveal.dive{transform:scale(9)}                       /* hurled THROUGH the doorway into the dark interior */
   #introRevealImg{width:100%;height:100%;object-fit:cover;display:block;
     filter:brightness(.4) blur(5px);transition:filter .5s ease-out}       /* settles out of a blur as the hood lifts… */
   #introReveal.lit #introRevealImg{filter:brightness(1) blur(0)}          /* …the building snaps clear + bright (you SEE it) */
-  #introVoid{position:absolute;left:var(--dx);top:var(--dy);width:var(--dw);height:var(--dh);
-    transform:translate(-50%,-50%) scale(.06,.6);transform-origin:center;
-    background:#050505;border-radius:46% 46% 6% 6%/34% 34% 3% 3%;box-shadow:0 0 44px 12px rgba(0,0,0,.92);
-    transition:transform .5s cubic-bezier(.5,0,.25,1)}                     /* the dark interior: parts open from the door seam */
-  #introReveal.opening #introVoid{transform:translate(-50%,-50%) scale(1,1)}
+  /* the building's ARCHED double doors: brown leaves over the painted doorway that SWING open to the dark interior */
+  #introDoors{position:absolute;left:var(--dx);top:var(--dy);width:var(--dw);height:var(--dh);
+    transform:translate(-50%,-50%);perspective:1000px;pointer-events:none}
+  /* closed = invisible (you see the REAL painted door); opening = dark interior appears + dark rectangular leaves swing out */
+  #introVoid{position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 28%,#0b0a08,#010101);
+    border-radius:3px;box-shadow:inset 0 12px 34px rgba(0,0,0,.96);opacity:0;transition:opacity .2s ease-in}
+  #introReveal.opening #introVoid{opacity:1}
+  .introLeaf{position:absolute;top:0;height:100%;width:50%;box-sizing:border-box;backface-visibility:hidden;overflow:hidden;
+    background:linear-gradient(180deg,#4a2e16,#311c0c);border:2px solid #150b04;box-shadow:inset 0 0 24px rgba(0,0,0,.72);
+    opacity:0;transition:transform .58s cubic-bezier(.42,0,.18,1),opacity .16s ease-in}
+  .introLeaf::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(0,0,0,.4) 0 2px,transparent 2px 13px)}  /* plank seams */
+  #introLeafL{left:0;transform-origin:left center;border-right:1px solid #120a04}
+  #introLeafR{right:0;transform-origin:right center;border-left:1px solid #120a04}
+  #introReveal.opening .introLeaf{opacity:1}
+  #introReveal.opening #introLeafL{transform:rotateY(-122deg)}            /* the doors swing OPEN (hinged on the outer edges) */
+  #introReveal.opening #introLeafR{transform:rotateY(122deg)}
   #introBlack{position:absolute;inset:0;z-index:201;background:#000;opacity:0;pointer-events:none;transition:opacity .55s ease-in}
   #introBlack.on{opacity:1}
   #loadingScreen{position:absolute;inset:0;z-index:202;background:#000;
@@ -456,7 +467,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b64 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b65 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -521,7 +532,7 @@
 
   <!-- intro reveal image + cinematic door rig (uncovered once per session: bag off -> doors open -> dive into the dark) -->
   <div id="introReveal" class="hide"><img id="introRevealImg" src="__INTRO_REVEAL__" alt="">
-    <div id="introVoid"></div>
+    <div id="introDoors"><div id="introVoid"></div><div id="introLeafL" class="introLeaf"></div><div id="introLeafR" class="introLeaf"></div></div>
   </div>
   <div id="introBlack"></div>
   <!-- loading screen ("Bringing Goy into the system") -->

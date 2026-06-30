@@ -119,7 +119,20 @@ function cardHoldPct(c){ return Math.round((1-stealChance(CONTEST_AVG, STATS[c].
 // `arch` = archetype label (per BASED_CUP_STAT_DESIGN.md). `owned` is the collection-ready seam:
 // true for everyone now; the carousel reads isOwned() per character so cosmetic rarity / packs can
 // slot in later WITHOUT re-architecting. Order = carousel order (pace-leaning → wall).
-const ROSTER=['pepe','elon','pdidpe','obampe','chad','wojak','okeyjak','sadjak','doomer','boomer','soyjak','trumpe','grandpa','oldwoj'];
+// FIX 3 (b87): carousel DISPLAY order only (no stat/overall/data change). All "-pe" enders first, then
+// all "-jak" enders, each group sorted by OVERALL desc; ALEX (boomer) pinned to the very END regardless.
+// Computed from the data so it stays correct if stats change. (CHAD — neither -pe nor -jak — sorts into the
+// "other" group, landing just before ALEX.)
+const ROSTER=(function(){
+  const ALEX='boomer';
+  const all=['pepe','elon','pdidpe','obampe','chad','wojak','okeyjak','sadjak','doomer','boomer','soyjak','trumpe','grandpa','oldwoj'];
+  const grp=k=>{ const n=STATS[k].name; return /pe$/i.test(n)?0 : /jak$/i.test(n)?1 : 2; };   // 0=-pe, 1=-jak, 2=other
+  return all.filter(k=>k!==ALEX).sort((a,b)=>{
+    const ga=grp(a), gb=grp(b); if(ga!==gb) return ga-gb;                 // group order: pe, jak, other
+    const oa=overallOf(a), ob=overallOf(b); if(ob!==oa) return ob-oa;     // within a group: overall descending
+    return STATS[a].name.localeCompare(STATS[b].name);                    // stable tie-break
+  }).concat([ALEX]);                                                       // ALEX pinned last
+})();
 function archetypeOf(c){ return (STATS[c]&&STATS[c].arch)||'All-rounder'; }   // archetype lives in STATS now (single source)
 function isOwned(c){ return true; }   // collection seam — all owned for now; locker honours this per character
 let equippedChar='pepe';   // the ACTIVE character chosen in the Locker; every match flow uses it (set via setEquipped)
@@ -227,6 +240,7 @@ let SLOWMO_DEBUG=false;        // set true (here/console) to console.log the rea
 const SLOWMO_ZOOM=1.5;         // cinematic zoom-in during slow-mo (1.0 = no zoom)
 const SLOWMO_ZOOM_EASE=0.14;   // how fast the zoom eases in/out
 const SLOWMO_FOLLOW_EASE=0.35; // how tightly the camera tracks its focus (ball/goal) during slow-mo — higher = snappier
+const SLOWMO_GOAL_SNAP_EASE=0.92; // FIX 4 (b87): goal-LOCK case snaps FAST onto the target goal (vs the gentle follow-ball ease) so you clearly see the ball cross
 let FORCE_GOAL_SLOWMO=false;   // DEBUG: set true (here, or live in the console) => EVERY goal slow-mos, ignoring the gate
 let slowmoT=0, netSlowmo=false, motionScale=1;   // slow-mo remaining (s) · guest's streamed flag · eased per-frame motion scale (SMOOTH slow-mo, no frame-skip)
 let camZoom=1, camFocusX=W/2, camFocusY=H/2;     // cinematic camera: zoom + focus during slow-mo
@@ -950,6 +964,7 @@ function onTimeUp(){
 }
 
 function showToast(txt,col){const el=document.getElementById('toast');
+  el.classList.remove('slam');   // FIX 5 (b87): info toasts use the framed game-style look; only scoreGoal re-adds .slam for the boxless GOAL juice
   el.textContent=txt; el.style.color='#fff';
   el.style.textShadow=`0 4px 0 #000,0 0 34px ${col}`; toastT=60;}
 // b85: juiced yellow/red card flash (like real football) — a card slams onto the screen, holds, then fades.
@@ -1195,16 +1210,17 @@ function draw(){
   // menu / title / lobby screens get the cinematic backdrop; matches show the pitch
   if(state!=='play' && state!=='win' && state!=='paused'){ drawTitleScene(); return; }
   // cinematic slow-mo camera: FOLLOW the ball (long-range shot) or LOCK on the target goal (short-range), decided at arm-time
-  let _fx=W/2, _fy=H/2;
+  let _fx=W/2, _fy=H/2, _snap=false;
   if(isSlowmo()){
     const camGoal = (netRole==='guest') ? (netCamMode==='goal') : (slowmoCamMode==='goal');
     const camSide = (netRole==='guest') ? netCamSide : slowmoCamSide;
-    if(goalFx){ _fx=goalFx.gx; _fy=goalFx.gy; }                          // during the blast, frame the goal where it happened
-    else if(camGoal){ _fx=(camSide==='L'?FIELD.l:FIELD.r); _fy=H/2; }    // short-range: locked on the target goal
-    else if(ball){ _fx=ball.x; _fy=ball.y; }                             // long-range: follow the ball all the way in
+    if(goalFx){ _fx=goalFx.gx; _fy=goalFx.gy; _snap=true; }              // during the blast, frame the goal where it happened
+    else if(camGoal){ _fx=(camSide==='L'?FIELD.l:FIELD.r); _fy=H/2; _snap=true; }   // FIX 4: short-range -> SNAP fast onto the target goal
+    else if(ball){ _fx=ball.x; _fy=ball.y; }                             // long-range: follow the ball all the way in (gentle ease, unchanged)
   }
   camZoom   += ((isSlowmo()?SLOWMO_ZOOM:1) - camZoom)*SLOWMO_ZOOM_EASE;
-  camFocusX += (_fx-camFocusX)*SLOWMO_FOLLOW_EASE; camFocusY += (_fy-camFocusY)*SLOWMO_FOLLOW_EASE;
+  const _camEase = _snap ? SLOWMO_GOAL_SNAP_EASE : SLOWMO_FOLLOW_EASE;   // goal-lock snaps quickly; follow-ball keeps the gentle ease
+  camFocusX += (_fx-camFocusX)*_camEase; camFocusY += (_fy-camFocusY)*_camEase;
   { const hw=W/(2*camZoom), hh=H/(2*camZoom); camFocusX=clamp(camFocusX,hw,W-hw); camFocusY=clamp(camFocusY,hh,H-hh); }   // keep the view on-field
   ctx.save();
   ctx.translate(camFocusX,camFocusY); ctx.scale(camZoom,camZoom); ctx.translate(-camFocusX,-camFocusY);   // zoom toward focus
@@ -2262,7 +2278,8 @@ function gotoLocker(i){ loIdx=Math.max(0,Math.min(ROSTER.length-1,i));
 function flipActiveCard(){ const s=$('loTrack').children[loIdx]; if(s) s.classList.toggle('flip'); }
 function openLocker(){ hideAllOverlays(); loadEquipped(); buildLockerCards();
   loIdx=Math.max(0,ROSTER.indexOf(equippedChar)); positionLocker(); $('lockerScreen').classList.remove('hide'); }
-function closeLocker(){ $('lockerScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); }
+function closeLocker(){ const t=$('loTrack'); if(t) for(let k=0;k<t.children.length;k++) t.children[k].classList.remove('flip');   // FIX 2 (b87): reset all flips on leaving the locker (per-card flip already resets on navigate/swipe)
+  $('lockerScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); }
 $('lockerBtn').onclick=()=>{ audioInit(); openLocker(); };
 $('lockerBackBtn').onclick=closeLocker;
 $('loPrev').onclick=()=>gotoLocker(loIdx-1);
@@ -2317,7 +2334,10 @@ $('selStartBtn').onclick=()=>{
   }
   beginGame();
 };
-$('practiceBtn').onclick=()=>openSelect('practice');
+// FIX 1 (b87): Practice launches STRAIGHT IN with the equipped character (like quick/wager/friend) —
+// no character/opponent select screen. Defaults to vs-CPU at the current difficulty.
+$('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
+  gameMode='goals'; ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
 let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;

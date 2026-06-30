@@ -2046,9 +2046,16 @@ function commitMatchStats(winSide){
 }
 
 let loIdx=0, loBuilt=false;
+// ---- b75 DISPLAY-ONLY: half-star ratings + ore tiers (cosmetic; map from the real values, change nothing) ----
+function roundHalf(x){ return Math.max(0.5, Math.min(5, Math.round(x*2)/2)); }
+function grabStars(c){ return roundHalf(STATS[c].grab-47); }   // grab 48 -> 1.0★ ... 52 -> 5.0★ (linear)
+function holdStars(c){ return roundHalf(STATS[c].drb/4); }     // Dribbling /20 -> 1-5★
+function tackleStars(c){ return roundHalf(STATS[c].def/4); }   // Defending /20 -> 1-5★
+function starHTML(r){ var h=''; for(var i=1;i<=5;i++){ var cls=r>=i?'full':(r>=i-0.5?'half':''); h+='<span class="loStar '+cls+'">★</span>'; } return '<span class="loStars">'+h+'</span>'; }
+function oreTier(c){ var o=overallOf(c); return o>=94?'netherite':o>=88?'diamond':o>=84?'gold':o>=80?'iron':'stone'; }   // cosmetic band, by OVERALL (no power)
 function lockerFrontHTML(c){ const s=STATS[c];
   const bar=(lbl,v)=>'<div class="loStat"><span class="ll">'+lbl+'</span><span class="lb"><b style="width:'+(v*5)+'%"></b></span><span class="lv">'+v+'</span></div>';
-  return '<div class="loFace loFront"><div class="loEquipBadge">✓ EQUIPPED</div>'
+  return '<div class="loFace loFront"><div class="loEquipBadge">✓ EQUIPPED</div><i class="loSheen"></i>'
     + '<div class="loHead"><div class="loRating"><b>'+overallOf(c)+'</b><span>OVR</span></div><div class="loArchChip">'+archetypeOf(c)+'</div></div>'
     + '<div class="loArt"><img alt="" src="'+imgFor(c).src+'"></div>'
     + '<div class="loName">'+s.name+'</div>'
@@ -2057,14 +2064,14 @@ function lockerBackHTML(c){ const s=STATS[c], r=getCharRecord(c), sp=speedSplit(
   const row=(lbl,val)=>'<div class="loRec"><span>'+lbl+'</span><b>'+val+'</b></div>';
   return '<div class="loFace loBackFace"><div class="loBackHead"><b>'+s.name+'</b><span>'+archetypeOf(c).toUpperCase()+'</span></div>'
     + '<div class="loBackSub">CARD DETAIL</div><div class="loRecGrid">'
-    + row('On-ball speed', sp.on) + row('Off-ball speed', sp.off) + row('Grab radius', s.grab)
-    + row('Hold-ball', cardHoldPct(c)+'%') + row('Tackle win', cardTacklePct(c)+'%')
+    + row('On-ball speed', sp.on) + row('Off-ball speed', sp.off)
+    + row('Grab radius', starHTML(grabStars(c))) + row('Hold-ball', starHTML(holdStars(c))) + row('Tackle win', starHTML(tackleStars(c)))
     + '</div><div class="loBackSub">YOUR RECORD</div><div class="loRecGrid">'
     + row('Win / loss', r.wins+' / '+r.losses) + row('Goals (for / ag)', r.gf+' / '+r.ga)
     + row('Own goals', r.og) + row('Dribble %', recPct(r.dribbleOk,r.dribbleTry)) + row('Tackle %', recPct(r.tackleOk,r.tackleTry))
     + '</div></div>'; }
 function buildLockerCards(){ const track=$('loTrack'); if(!track) return; track.innerHTML='';
-  ROSTER.forEach((c,i)=>{ const slot=document.createElement('div'); slot.className='loSlot'+(isOwned(c)?'':' locked');
+  ROSTER.forEach((c,i)=>{ const slot=document.createElement('div'); slot.className='loSlot tier-'+oreTier(c)+(isOwned(c)?'':' locked');
     slot.setAttribute('data-i',i); slot.setAttribute('data-char',c);
     slot.innerHTML='<div class="loLock">🔒</div><div class="loFlip">'+lockerFrontHTML(c)+lockerBackHTML(c)+'</div>';
     track.appendChild(slot); });

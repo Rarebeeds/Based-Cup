@@ -10,11 +10,19 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   const hours = Math.min(168, Math.max(1, Number(req.query.hours) || 12));
+  // mode: 'hourly' = current AEST clock-hour (hard reset on the hour); 'alltime' = cumulative forever;
+  // anything else = the legacy rolling N-hour window. hourly/alltime read the SAME match_results table,
+  // just with a different time predicate (hourly) or none (alltime) — so the hourly reset never touches all-time.
+  const mode = String(req.query.mode || '').toLowerCase();
 
   // single-player rank
   if (req.query.rankFor) {
-    const { data, error } = await supa.rpc('player_rank',
-      { p_username: String(req.query.rankFor), window_hours: hours });
+    const u = String(req.query.rankFor);
+    let rpc, args;
+    if (mode === 'hourly')      { rpc = 'hourly_player_rank';  args = { p_username: u }; }
+    else if (mode === 'alltime'){ rpc = 'alltime_player_rank'; args = { p_username: u }; }
+    else                        { rpc = 'player_rank';         args = { p_username: u, window_hours: hours }; }
+    const { data, error } = await supa.rpc(rpc, args);
     if (error) return res.status(500).json({ error: error.message });
     const row = (data && data[0]) || null;
     return res.status(200).json(row
@@ -24,7 +32,11 @@ export default async function handler(req, res) {
 
   // top board
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-  const { data, error } = await supa.rpc('leaderboard', { window_hours: hours, max_rows: limit });
+  let rpc, args;
+  if (mode === 'hourly')      { rpc = 'hourly_leaderboard';  args = { max_rows: limit }; }
+  else if (mode === 'alltime'){ rpc = 'alltime_leaderboard'; args = { max_rows: limit }; }
+  else                        { rpc = 'leaderboard';         args = { window_hours: hours, max_rows: limit }; }
+  const { data, error } = await supa.rpc(rpc, args);
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ windowHours: hours, players: data.length, leaderboard: data });
+  return res.status(200).json({ mode: mode || ('rolling-' + hours + 'h'), players: data.length, leaderboard: data });
 }

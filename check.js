@@ -1067,9 +1067,11 @@ function draw(){
     // players
     if(oppActive) drawPlayer(players.t,imgFor(players.t.char),'#ff8787');
     drawPlayer(players.p,imgFor(players.p.char),'#69db7c');
-    // aim arrows for human-controlled players
-    drawAim(players.p,'#9bf6a8', ball.owner==='p');
-    if(oppActive && (mode==='2p'||netRole)) drawAim(players.t,'#ffb3b3', ball.owner==='t');
+    // aim arrows for human-controlled players — NOT in keep-away (it's a possession mode, no shooting; arrow is just noise)
+    if(gameMode!=='keepaway'){
+      drawAim(players.p,'#9bf6a8', ball.owner==='p');
+      if(oppActive && (mode==='2p'||netRole)) drawAim(players.t,'#ffb3b3', ball.owner==='t');
+    }
   }
   ctx.restore();   // end screen shake
 
@@ -1529,6 +1531,17 @@ const LB = {
   async rank(username, hours=12){
     if(!this.on()) return null;
     try{ return await (await fetch(`${this.base()}/api/leaderboard?rankFor=${encodeURIComponent(username)}&hours=${hours}`)).json(); }
+    catch(e){ return null; }
+  },
+  // mode = 'hourly' (current AEST clock-hour, hard reset on the hour) | 'alltime' (cumulative forever)
+  async boardMode(mode, limit=20){
+    if(!this.on()) return null;
+    try{ return await (await fetch(`${this.base()}/api/leaderboard?mode=${mode}&limit=${limit}`)).json(); }
+    catch(e){ return null; }
+  },
+  async rankMode(mode, username){
+    if(!this.on()) return null;
+    try{ return await (await fetch(`${this.base()}/api/leaderboard?mode=${mode}&rankFor=${encodeURIComponent(username)}`)).json(); }
     catch(e){ return null; }
   }
 };
@@ -2709,15 +2722,18 @@ function renderLocalBoard(){
     list.appendChild(row); });
   $('yourRank').textContent = myRank? ('Your rank: #'+myRank+' of '+all.length) : '';
 }
-async function openBoard(){
-  hideAllOverlays(); $('boardScreen').classList.remove('hide');
+let boardModeCur='hourly';   // 'hourly' (current AEST clock-hour, hard reset) | 'alltime' (cumulative forever)
+function openBoard(){ hideAllOverlays(); $('boardScreen').classList.remove('hide'); renderBoard(boardModeCur); }
+async function renderBoard(mode){
+  boardModeCur=mode;
+  document.querySelectorAll('#boardTabs button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-board')===mode));
   const list=$('boardList'); $('yourRank').textContent='';
   if(LB.on()){
     list.innerHTML='<div class="empty">Loading…</div>';
-    const data=await LB.board(12,20);
+    const data=await LB.boardMode(mode,20);
     if(data && data.leaderboard){
       list.innerHTML='';
-      if(!data.leaderboard.length) list.innerHTML='<div class="empty">No ranked wins in the last 12h yet.</div>';
+      if(!data.leaderboard.length) list.innerHTML='<div class="empty">'+(mode==='hourly'?'No wins yet this hour — go win one!':'No ranked wins yet.')+'</div>';
       // fetch profile pictures for the shown players (usernames only — no wallets exposed)
       let avaMap={};
       if(sb && data.leaderboard.length){
@@ -2735,19 +2751,22 @@ async function openBoard(){
         list.appendChild(row); });
       list.querySelectorAll('[data-prof]').forEach(b=>{ b.style.cursor='pointer';
         b.onclick=()=> openPubProfile(b.getAttribute('data-prof'), openBoard); });
-      const r=account? await LB.rank(account.username,12):null;
-      $('yourRank').textContent=(r&&r.rank)?('Your rank: #'+r.rank+' of '+r.of+' · last 12h'):'';
+      const r=account? await LB.rankMode(mode, account.username):null;
+      $('yourRank').textContent=(r&&r.rank)?('Your rank: #'+r.rank+' of '+r.of+(mode==='hourly'?' · this hour (AEST)':' · all time')):'';
       return;
     }
   }
-  renderLocalBoard();   // offline / server unreachable
+  // offline / server unreachable: all-time falls back to local cumulative; hourly can't be computed without the server
+  if(mode==='alltime'){ renderLocalBoard(); }
+  else { list.innerHTML='<div class="empty">Hourly ladder needs a connection.</div>'; }
 }
+seg('boardTabs','data-board',renderBoard);
 $('boardBtn').onclick=openBoard;
 // top-3 auto-shown on the home menu (online board, falling back to local accounts)
 async function renderMenuTop3(){
   const list=$('menuBoardList'); if(!list) return;
   let rows=[];
-  try{ if(LB.on()){ const data=await LB.board(12,3);
+  try{ if(LB.on()){ const data=await LB.boardMode('hourly',3);
     if(data && data.leaderboard) rows=data.leaderboard.slice(0,3).map(p=>({n:p.username,w:p.wins,l:p.losses})); } }catch(e){}
   if(!rows.length) rows=Object.values(accounts()).sort((a,b)=>b.wins-a.wins||a.losses-b.losses)
     .filter(p=>(p.wins||0)+(p.losses||0)>0).slice(0,3).map(p=>({n:p.username,w:p.wins||0,l:p.losses||0}));

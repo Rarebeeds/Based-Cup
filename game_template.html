@@ -473,7 +473,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b68 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b69 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -689,7 +689,7 @@
       <div class="row"><button class="btn" id="storeBtn" style="width:100%;background:linear-gradient(180deg,#6a45b0,#4a2f86);border:2px solid #b08cff">🛒 STORE</button></div>
 
       <div id="menuBoard" title="Open the full leaderboard">
-        <div class="dhead"><span>🏆 TOP PLAYERS</span><span class="sub">last 12h ›</span></div>
+        <div class="dhead"><span>🏆 TOP PLAYERS</span><span class="sub">this hour ›</span></div>
         <div id="menuBoardList"><div class="empty" style="padding:3px">Loading…</div></div>
       </div>
 
@@ -890,9 +890,13 @@
   <div class="overlay hide" id="boardScreen">
     <div class="card">
       <div class="formTitle">🏆 LEADERBOARD</div>
+      <div class="seg" id="boardTabs" style="margin-bottom:8px">
+        <button data-board="hourly" class="on">⏱️ This Hour</button>
+        <button data-board="alltime">🏆 All Time</button>
+      </div>
       <div class="boardList" id="boardList"></div>
       <div class="yourRank" id="yourRank"></div>
-      <div class="muted note">Local ranking of accounts on this device. A global 12-hour board and SOL rewards would require an online server.</div>
+      <div class="muted note" id="boardNote">This Hour resets at the top of every hour (Brisbane / AEST). All Time is cumulative wins, forever.</div>
       <div class="row"><button class="btn ghost" id="boardBackBtn">BACK</button></div>
     </div>
   </div>
@@ -1997,9 +2001,11 @@ function draw(){
     // players
     if(oppActive) drawPlayer(players.t,imgFor(players.t.char),'#ff8787');
     drawPlayer(players.p,imgFor(players.p.char),'#69db7c');
-    // aim arrows for human-controlled players
-    drawAim(players.p,'#9bf6a8', ball.owner==='p');
-    if(oppActive && (mode==='2p'||netRole)) drawAim(players.t,'#ffb3b3', ball.owner==='t');
+    // aim arrows for human-controlled players — NOT in keep-away (it's a possession mode, no shooting; arrow is just noise)
+    if(gameMode!=='keepaway'){
+      drawAim(players.p,'#9bf6a8', ball.owner==='p');
+      if(oppActive && (mode==='2p'||netRole)) drawAim(players.t,'#ffb3b3', ball.owner==='t');
+    }
   }
   ctx.restore();   // end screen shake
 
@@ -2459,6 +2465,17 @@ const LB = {
   async rank(username, hours=12){
     if(!this.on()) return null;
     try{ return await (await fetch(`${this.base()}/api/leaderboard?rankFor=${encodeURIComponent(username)}&hours=${hours}`)).json(); }
+    catch(e){ return null; }
+  },
+  // mode = 'hourly' (current AEST clock-hour, hard reset on the hour) | 'alltime' (cumulative forever)
+  async boardMode(mode, limit=20){
+    if(!this.on()) return null;
+    try{ return await (await fetch(`${this.base()}/api/leaderboard?mode=${mode}&limit=${limit}`)).json(); }
+    catch(e){ return null; }
+  },
+  async rankMode(mode, username){
+    if(!this.on()) return null;
+    try{ return await (await fetch(`${this.base()}/api/leaderboard?mode=${mode}&rankFor=${encodeURIComponent(username)}`)).json(); }
     catch(e){ return null; }
   }
 };
@@ -3639,15 +3656,18 @@ function renderLocalBoard(){
     list.appendChild(row); });
   $('yourRank').textContent = myRank? ('Your rank: #'+myRank+' of '+all.length) : '';
 }
-async function openBoard(){
-  hideAllOverlays(); $('boardScreen').classList.remove('hide');
+let boardModeCur='hourly';   // 'hourly' (current AEST clock-hour, hard reset) | 'alltime' (cumulative forever)
+function openBoard(){ hideAllOverlays(); $('boardScreen').classList.remove('hide'); renderBoard(boardModeCur); }
+async function renderBoard(mode){
+  boardModeCur=mode;
+  document.querySelectorAll('#boardTabs button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-board')===mode));
   const list=$('boardList'); $('yourRank').textContent='';
   if(LB.on()){
     list.innerHTML='<div class="empty">Loading…</div>';
-    const data=await LB.board(12,20);
+    const data=await LB.boardMode(mode,20);
     if(data && data.leaderboard){
       list.innerHTML='';
-      if(!data.leaderboard.length) list.innerHTML='<div class="empty">No ranked wins in the last 12h yet.</div>';
+      if(!data.leaderboard.length) list.innerHTML='<div class="empty">'+(mode==='hourly'?'No wins yet this hour — go win one!':'No ranked wins yet.')+'</div>';
       // fetch profile pictures for the shown players (usernames only — no wallets exposed)
       let avaMap={};
       if(sb && data.leaderboard.length){
@@ -3665,19 +3685,22 @@ async function openBoard(){
         list.appendChild(row); });
       list.querySelectorAll('[data-prof]').forEach(b=>{ b.style.cursor='pointer';
         b.onclick=()=> openPubProfile(b.getAttribute('data-prof'), openBoard); });
-      const r=account? await LB.rank(account.username,12):null;
-      $('yourRank').textContent=(r&&r.rank)?('Your rank: #'+r.rank+' of '+r.of+' · last 12h'):'';
+      const r=account? await LB.rankMode(mode, account.username):null;
+      $('yourRank').textContent=(r&&r.rank)?('Your rank: #'+r.rank+' of '+r.of+(mode==='hourly'?' · this hour (AEST)':' · all time')):'';
       return;
     }
   }
-  renderLocalBoard();   // offline / server unreachable
+  // offline / server unreachable: all-time falls back to local cumulative; hourly can't be computed without the server
+  if(mode==='alltime'){ renderLocalBoard(); }
+  else { list.innerHTML='<div class="empty">Hourly ladder needs a connection.</div>'; }
 }
+seg('boardTabs','data-board',renderBoard);
 $('boardBtn').onclick=openBoard;
 // top-3 auto-shown on the home menu (online board, falling back to local accounts)
 async function renderMenuTop3(){
   const list=$('menuBoardList'); if(!list) return;
   let rows=[];
-  try{ if(LB.on()){ const data=await LB.board(12,3);
+  try{ if(LB.on()){ const data=await LB.boardMode('hourly',3);
     if(data && data.leaderboard) rows=data.leaderboard.slice(0,3).map(p=>({n:p.username,w:p.wins,l:p.losses})); } }catch(e){}
   if(!rows.length) rows=Object.values(accounts()).sort((a,b)=>b.wins-a.wins||a.losses-b.losses)
     .filter(p=>(p.wins||0)+(p.losses||0)>0).slice(0,3).map(p=>({n:p.username,w:p.wins||0,l:p.losses||0}));

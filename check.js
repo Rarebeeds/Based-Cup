@@ -169,10 +169,14 @@ const SLOWMO_ZONE=110;         // px in front of a goal line where a fast goal-b
 const SLOWMO_BALL_SPEED=6;     // min ball speed toward the goal (px/frame) to count as a real goal-bound shot
 const SLOWMO_LAST_SECS=20;     // gate: only inside the last N seconds...
 const SLOWMO_MARGIN=1;         // ...of the 2nd half, and only when the pre-goal score margin <= this (tied / one-goal game)
-const SLOWMO_ZOOM=1.5;         // cinematic zoom-in toward the ball during slow-mo (1.0 = no zoom)
+const SLOWMO_ZOOM=1.5;         // cinematic zoom-in during slow-mo (1.0 = no zoom)
+const SLOWMO_ZOOM_EASE=0.14;   // how fast the zoom eases in/out
+const SLOWMO_FOLLOW_EASE=0.35; // how tightly the camera tracks its focus (ball/goal) during slow-mo — higher = snappier
 let FORCE_GOAL_SLOWMO=false;   // DEBUG: set true (here, or live in the console) => EVERY goal slow-mos, ignoring the gate
 let slowmoT=0, netSlowmo=false, motionScale=1;   // slow-mo remaining (s) · guest's streamed flag · eased per-frame motion scale (SMOOTH slow-mo, no frame-skip)
-let camZoom=1, camFocusX=W/2, camFocusY=H/2;     // cinematic camera: zoom + focus toward the ball during slow-mo
+let camZoom=1, camFocusX=W/2, camFocusY=H/2;     // cinematic camera: zoom + focus during slow-mo
+let slowmoCamMode='ball', slowmoCamSide='R';     // 'ball'=follow the ball (long-range shot) · 'goal'=lock on the target goal (short-range). Side = which goal.
+let netCamMode='ball', netCamSide='R';           // guest copies, streamed from the host so both see the same framing
 let goalFx=null, shakeAmp=0;    // active explosion + screen-shake amplitude
 let goalSeq=0, goalFxSide='', goalSeen=0;   // streamed goal-event counter (host increments, guest detonates on change)
 let gameMode='goals', possP=0, possT=0;   // keepaway mode: hold the ball longest
@@ -196,7 +200,8 @@ function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; ti
   clearTimeout(htTimer); hideHalftime();
   setMeta(''); updateHUD(); reset(); goalLock=0;
   goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
-  slowmoT=0; netSlowmo=false; motionScale=1; camZoom=1; camFocusX=W/2; camFocusY=H/2;}   // reset goal-juice + slow-mo + camera each match
+  slowmoT=0; netSlowmo=false; motionScale=1; camZoom=1; camFocusX=W/2; camFocusY=H/2;
+  slowmoCamMode='ball'; slowmoCamSide='R'; netCamMode='ball'; netCamSide='R';}   // reset goal-juice + slow-mo + camera each match
 function halfLabel(){ if(gameMode==='keepaway') return 'KEEP-AWAY · HOLD IT';
   return half===2?'2ND HALF':'1ST HALF'; }
 
@@ -910,7 +915,17 @@ function maybeArmSlowmo(){
   if(!(ball.y>GY0 && ball.y<GY1)) return;                          // must be on target (inside the mouth)
   const nearL = ball.x < FIELD.l+SLOWMO_ZONE && ball.vx < -SLOWMO_BALL_SPEED;   // screaming into the LEFT goal
   const nearR = ball.x > FIELD.r-SLOWMO_ZONE && ball.vx >  SLOWMO_BALL_SPEED;   // screaming into the RIGHT goal
-  if((nearL||nearR) && slowmoGateOk()) slowmoT=Math.max(slowmoT, GOAL_SLOWMO_MS/1000);   // keep topped while in the zone -> whole crossing stays slow
+  if((nearL||nearR) && slowmoGateOk()){
+    if(slowmoT<=0){                                  // FIRST arm: pick the cinematic framing ONCE (never flip mid-slow-mo)
+      slowmoCamSide = nearL ? 'L' : 'R';             // the goal being scored on
+      const strikeX = (ball.kickX!=null) ? ball.kickX : ball.x;          // where the shot was STRUCK from (set in tryKick)
+      // short-range = struck INSIDE the opponent's half (the half holding the target goal) -> LOCK on that goal.
+      // long-range  = struck from own half / beyond halfway -> FOLLOW the ball the whole way in.
+      const shortRange = slowmoCamSide==='R' ? (strikeX > W/2) : (strikeX < W/2);
+      slowmoCamMode = shortRange ? 'goal' : 'ball';
+    }
+    slowmoT=Math.max(slowmoT, GOAL_SLOWMO_MS/1000);  // keep topped while in the zone -> whole crossing stays slow
+  }
 }
 function isSlowmo(){ return netRole==='guest' ? netSlowmo : slowmoT>0; }   // guest follows the host's streamed flag
 function triggerGoalFx(side){
@@ -975,10 +990,17 @@ function drawGoalFx(){
 function draw(){
   // menu / title / lobby screens get the cinematic backdrop; matches show the pitch
   if(state!=='play' && state!=='win' && state!=='paused'){ drawTitleScene(); return; }
-  // cinematic camera: ease a zoom toward the ball (or the goal during the blast) while slow-mo is active, back out otherwise
-  const _fx = goalFx ? goalFx.gx : (ball?ball.x:W/2), _fy = goalFx ? goalFx.gy : (ball?ball.y:H/2);
-  camZoom   += ((isSlowmo()?SLOWMO_ZOOM:1) - camZoom)*0.14;
-  camFocusX += (_fx-camFocusX)*0.18; camFocusY += (_fy-camFocusY)*0.18;
+  // cinematic slow-mo camera: FOLLOW the ball (long-range shot) or LOCK on the target goal (short-range), decided at arm-time
+  let _fx=W/2, _fy=H/2;
+  if(isSlowmo()){
+    const camGoal = (netRole==='guest') ? (netCamMode==='goal') : (slowmoCamMode==='goal');
+    const camSide = (netRole==='guest') ? netCamSide : slowmoCamSide;
+    if(goalFx){ _fx=goalFx.gx; _fy=goalFx.gy; }                          // during the blast, frame the goal where it happened
+    else if(camGoal){ _fx=(camSide==='L'?FIELD.l:FIELD.r); _fy=H/2; }    // short-range: locked on the target goal
+    else if(ball){ _fx=ball.x; _fy=ball.y; }                             // long-range: follow the ball all the way in
+  }
+  camZoom   += ((isSlowmo()?SLOWMO_ZOOM:1) - camZoom)*SLOWMO_ZOOM_EASE;
+  camFocusX += (_fx-camFocusX)*SLOWMO_FOLLOW_EASE; camFocusY += (_fy-camFocusY)*SLOWMO_FOLLOW_EASE;
   { const hw=W/(2*camZoom), hh=H/(2*camZoom); camFocusX=clamp(camFocusX,hw,W-hw); camFocusY=clamp(camFocusY,hh,H-hh); }   // keep the view on-field
   ctx.save();
   ctx.translate(camFocusX,camFocusY); ctx.scale(camZoom,camZoom); ctx.translate(-camFocusX,-camFocusY);   // zoom toward focus
@@ -2338,7 +2360,7 @@ function sendState(extra){
     p:{x:R(p.x),y:R(p.y),aim:R2(p.aim),face:p.face,char:p.char,stam:R2(p.stamina),ch:R2(p.charge),cg:p.charging?1:0},
     t:{x:R(t.x),y:R(t.y),aim:R2(t.aim),face:t.face,char:t.char,stam:R2(t.stamina),ch:R2(t.charge),cg:t.charging?1:0},
     b:{x:R(ball.x),y:R(ball.y),roll:R2(ball.roll||0),dir:R2(ball.dir||0),net:ball.netSide||0,own:ball.owner||0},
-    s:[score.p,score.t], tl:R1(timeLeft), gl:golden, pp:R1(possP), tp:R1(possT), gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide, gq:goalSeq, gsd:goalFxSide, sm:slowmoT>0?1:0
+    s:[score.p,score.t], tl:R1(timeLeft), gl:golden, pp:R1(possP), tp:R1(possT), gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide, gq:goalSeq, gsd:goalFxSide, sm:slowmoT>0?1:0, cm:slowmoCamMode==='goal'?1:0, cs:slowmoCamSide
   }});
 }
 // guest buffers snapshots and renders in the past, gliding between them.
@@ -2371,6 +2393,8 @@ function applyNetState(){
   if(latest.rq!=null && latest.rq>rebSeen){ rebSeen=latest.rq; showToast('🎯 REBOUND +3s!', latest.rs==='p'?'#69db7c':'#ff8787'); }
   if(latest.gq!=null && latest.gq>goalSeen){ goalSeen=latest.gq; triggerGoalFx(latest.gsd||'L'); }   // detonate the goal explosion in sync with the host
   netSlowmo = !!latest.sm;                          // follow the host's slow-mo window (drives our prediction + FX pulldown)
+  if(latest.cm!=null) netCamMode = latest.cm?'goal':'ball';   // and the host's cinematic camera framing
+  if(latest.cs) netCamSide = latest.cs;
   if(latest.hf){ const wasHt=halftime; half=latest.hf; halftime=!!latest.ht;
     setMeta(halftime?'HALF TIME':halfLabel());
     if(halftime && !wasHt) showHalftime();          // host hit half-time -> show our 5s screen + freeze

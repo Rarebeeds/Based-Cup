@@ -2207,13 +2207,25 @@ function predictGuestSelf(){
   else { t.charging=false; t.charge=0; }
 }
 let P2P_DEBUG=true;   // b77 diagnostic: log the WebRTC handshake (ICE states, candidate TYPES, DC open, give-up reason) to the console
-// TURN servers — needed for P2P through SYMMETRIC NAT / CGNAT (common on AU residential NBN + all 4G/5G home internet),
-// which STUN alone CANNOT traverse. EMPTY = STUN-only (current behaviour, unchanged). To enable, paste Cloudflare TURN creds:
-//   const TURN_SERVERS=[{urls:['turn:turn.cloudflare.com:3478?transport=udp','turn:turn.cloudflare.com:3478?transport=tcp','turns:turn.cloudflare.com:5349?transport=tcp'], username:'<TURN key id>', credential:'<TURN token>'}];
-const TURN_SERVERS=[];
+// TURN servers for P2P through SYMMETRIC NAT / CGNAT (AU residential NBN + all 4G/5G home internet) — STUN can't traverse those.
+// AUTO-LOADED at match time from /api/turn (Cloudflare TURN, short-lived creds minted server-side; the key secret never
+// ships to the browser). EMPTY = STUN-only fallback (e.g. /api/turn not configured yet) — never breaks. To turn it ON, set
+// TURN_KEY_ID + TURN_KEY_API_TOKEN in the Vercel project env vars (see api/turn.js), then redeploy.
+let TURN_SERVERS=[];
+async function loadTurn(){
+  if(typeof fetch!=='function' || !(location.protocol==='http:'||location.protocol==='https:')) return;   // hosted only
+  if(TURN_SERVERS.length && (Date.now()-(loadTurn._at||0) < 3600000)) return;   // cache ~1h (creds are short-lived; refetch hourly)
+  try{ const r=await fetch(location.origin+'/api/turn',{cache:'no-store'}); if(!r.ok) return;
+    const d=await r.json();
+    if(d && d.iceServers){ TURN_SERVERS = Array.isArray(d.iceServers)?d.iceServers:[d.iceServers]; loadTurn._at=Date.now();
+      if(P2P_DEBUG) console.log('[p2p] TURN loaded from /api/turn ('+TURN_SERVERS.length+' server(s))'); }
+    else if(P2P_DEBUG) console.log('[p2p] /api/turn returned no creds — STUN-only (set TURN_KEY_ID + TURN_KEY_API_TOKEN in Vercel)');
+  }catch(e){}
+}
 const NET = {
   ws:null, role:null, intentionalClose:false, reconnTries:0,
   connect(then){
+    loadTurn();   // fetch short-lived TURN creds in parallel with the WS connect, so they're ready before p2pStart()
     let url=$('netUrl').value.trim();
     if(url===LOBBY_SERVERS.us){ url=DEFAULT_LOBBY; $('netUrl').value=url; DB.set('sh_lobby',url); DB.set('sh_region','syd'); }  // US relay not live yet -> fall back (e.g. an old invite link)
     if(!/^wss?:\/\//.test(url)){ $('netErr').textContent='Enter your lobby URL (wss://…).'; return; }

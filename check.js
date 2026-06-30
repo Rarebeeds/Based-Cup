@@ -181,7 +181,13 @@ const FOUL_CONTACT_DIST=PLAYER_R*2+7;   // centre-distance at which two bodies c
 const FOUL_BALL_REACH=PLAYER_R+BALL_R+7;// distance at which the lunger has "reached the ball"
 const FOUL_BALL_MARGIN=12;              // ball must be at least this much CLOSER than the opp body to be a CLEAN ball-win (else FOUL)
 // CPU: the AI can lunge to tackle (and can mistime it into a foul), reusing its existing decision logic.
-const LUNGE_AI_RANGE=120;        // px: CPU only considers a tackle-lunge within this range of the ball
+// AI lunge DECISION thresholds (b89) — the CPU only lunges when it's a smart, CLEAN tackle (ball-first),
+// reusing the same ball-vs-body comparison as the foul check so it rarely cards itself out. (The lunge
+// MECHANIC, human lunging, and the foul/card system are unchanged — only the AI's DECISION to lunge.)
+const LUNGE_AI_REACH_MARGIN=10;    // px slack on "can the lunge actually reach the ball" (reachable if dBall <= defender-reach + this)
+const LUNGE_AI_FOUL_MARGIN=18;     // ball must be at least this much CLOSER than the opp body for the AI to judge a clean ball-win (> the foul system's FOUL_BALL_MARGIN=12 so the AI errs safe)
+const LUNGE_AI_YELLOW_CAUTION=2.2; // an AI already on a yellow demands this× the clean margin (only lunge when VERY clearly clean — avoid a 2nd-yellow sending-off)
+const LUNGE_AI_DIVE_REF=12;        // diving reference: willingness scales by clamp(dive/REF) — high-diving defenders lunge readily, low-diving rarely
 const MATCH_TIME=60;              // 1:00 per half (goals)
 const KEEPAWAY_TIME=90;          // keep-away is a single 1:30 period (no half-time)
 function matchLen(){ return gameMode==='keepaway' ? KEEPAWAY_TIME : MATCH_TIME; }
@@ -633,10 +639,12 @@ function tryKick(pl, chargeAmt){
 function aiControl(pl){
   // Difficulty tiers escalate on FIVE axes, not one: reaction time, shot aim+accuracy, corner targeting,
   // defence/interception, and turn-to-turn unpredictability. (AI decision-logic only — stats/grabCap untouched.)
-  const D={easy:  {spd:.72, err:48, kick:.50, react:13, aimErr:.40, corner:.15, lead:.04, defend:.15, lunge:.010},
-           normal:{spd:.90, err:26, kick:.78, react:5,  aimErr:.16, corner:.62, lead:.16, defend:.55, lunge:.030},
-           hard:  {spd:1.0, err:10, kick:.95, react:1,  aimErr:.05, corner:.95, lead:.30, defend:1.0, lunge:.055}}[diff]
-        || {spd:.90,err:26,kick:.78,react:5,aimErr:.16,corner:.62,lead:.16,defend:.55,lunge:.030};
+  // lunge = per-frame willingness to lunge when the tackle reads CLEAN; lungeSloppy = chance it dives in ANYWAY
+  // when the read is a foul risk (easy = sloppy/dives in; hard = decisive + never dives into a foul).
+  const D={easy:  {spd:.72, err:48, kick:.50, react:13, aimErr:.40, corner:.15, lead:.04, defend:.15, lunge:.012, lungeSloppy:.60},
+           normal:{spd:.90, err:26, kick:.78, react:5,  aimErr:.16, corner:.62, lead:.16, defend:.55, lunge:.040, lungeSloppy:.20},
+           hard:  {spd:1.0, err:10, kick:.95, react:1,  aimErr:.05, corner:.95, lead:.30, defend:1.0, lunge:.075, lungeSloppy:.00}}[diff]
+        || {spd:.90,err:26,kick:.78,react:5,aimErr:.16,corner:.62,lead:.16,defend:.55,lunge:.040,lungeSloppy:.20};
   const ka=(gameMode==='keepaway');
   if(pl.aiTick==null){ pl.aiTick=0; pl.aiLastOwner='?'; pl.aiCorner=1; pl.aiLane=0; pl.aiTgt=null; }
   // pick a fresh PLAN each new possession (and rarely mid-possession) so the AI isn't identical every kickoff
@@ -671,10 +679,26 @@ function aiControl(pl){
   const hd=Math.hypot(players.p.x-pl.x, players.p.y-pl.y);
   const sprint = pl.stamina>0.25 && (dd>175 || ball.owner==='t');
   applyMoveAI(pl,ax*D.spd, ay*D.spd, sprint);
-  // b85: CPU tackle-lunge — when it doesn't have the ball and the ball is in lunge range, occasionally dash for it.
-  // Aimed at the ball so a good lunge wins it cleanly; a mistimed one collects the player = a foul (CPU can be carded too).
-  if(pl.lungeCD<=0 && pl.lunging<=0 && kickoffLock===0 && goalLock<=0 && ball.owner!=='t' && dd<LUNGE_AI_RANGE && Math.random()<D.lunge){
-    pl.aim=Math.atan2(ball.y-pl.y, ball.x-pl.x); tryLunge(pl);
+  // b89: AI lunge DECISION — only lunge when it's a SMART, CLEAN tackle (would make ball-first contact = win
+  // possession), not a flail into the player's body (= foul). Reuses the foul check's ball-vs-body comparison
+  // and the lunge MECHANIC's own reach math, so the CPU rarely cards itself out. Cooldown/stamina still gate
+  // inside tryLunge; the mechanic + human lunging + foul system are untouched.
+  if(pl.lungeCD<=0 && pl.lunging<=0 && kickoffLock===0 && goalLock<=0 && !pl.out && ball.owner!=='t'){
+    const dBall=dd;                                   // AI -> ball
+    const dOpp=hd;                                    // AI -> the human carrier (the only opponent in 1v1)
+    const div=(pl.dive!=null?pl.dive:10);
+    const reach=(LUNGE_DIST_BASE + div*LUNGE_DIST_PER_DIV)*LUNGE_DEF_BONUS;   // AI lunges WITHOUT the ball -> defender reach (same formula as tryLunge)
+    const canReach = dBall <= reach + LUNGE_AI_REACH_MARGIN;                  // (1)/(2): must actually reach the ball — no desperate out-of-range dives
+    const onYellow = (pl.cards||0)>=1;                                        // (2): already booked -> be far more cautious (avoid a 2nd-yellow sending-off)
+    const marginNeeded = LUNGE_AI_FOUL_MARGIN * (onYellow ? LUNGE_AI_YELLOW_CAUTION : 1);
+    const clean = (dOpp - dBall) >= marginNeeded;                            // (1): ball clearly closer than the body -> ball-first contact (legal, winnable)
+    const willing = D.lunge * clamp(div/LUNGE_AI_DIVE_REF, 0.3, 2.0);         // (3): high-diving chars lunge readily; low-diving rarely
+    if(canReach){
+      let go=false;
+      if(clean) go = Math.random() < willing;                                // smart clean tackle (4: hard is decisive, easy rare)
+      else if(!onYellow) go = Math.random() < willing * D.lungeSloppy;        // foul risk -> only a sloppy (easy) AI occasionally dives in; hard never; never on a yellow
+      if(go){ pl.aim=Math.atan2(ball.y-pl.y, ball.x-pl.x); tryLunge(pl); }
+    }
   }
   if(kickoffLock>0) kickoffLock--;
   if(ball.owner==='t'){

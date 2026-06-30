@@ -82,60 +82,74 @@ const SP_SCALE={pepe:1.0, trumpe:1.0, doomer:1.0, boomer:1.0, grandpa:1.0, soyja
 // onball/offball = move speed with/without the ball; power = shot charge; defense = steal contest + closing
 // bonus; dribble = ball retention; stamina = sprint endurance. Pace (display) = onball+offball.
 // Hit/control box stays IDENTICAL for all (grabCap) — NO stat changes any radius.
+// GRADED card model (b74). Six FRONT stats each /20 -> OVERALL /120 (cards have DIFFERENT overalls, a
+// power ladder, range 75-100). `grab` = per-card grab radius 48-52 (VISIBLE; the one place the hitbox
+// varies, tightly; NOT part of the overall). On/off-ball speed are DERIVED from pace (see speedSplit).
+// `arch` = archetype label. Diving is displayed but not wired to a mechanic yet. ONE table — locker + gameplay both read it.
+// (display renames only: doomer->RUGGEDJAK, oldwoj->OLDJAK; internal keys/sprites/lookups unchanged.)
 const STATS={
-  pepe:   {name:'PEPE',    abbr:'PEP', onball:9, offball:8, power:4,  defense:3,  dribble:8, stamina:4},
-  trumpe: {name:'TRUMPE',  abbr:'TRU', onball:4, offball:4, power:10, defense:7,  dribble:4, stamina:7},
-  doomer: {name:'DOOMJAK', abbr:'DJK', onball:5, offball:5, power:10, defense:5,  dribble:4, stamina:7},
-  boomer: {name:'ALEX',    abbr:'ALX', onball:4, offball:5, power:5,  defense:9,  dribble:4, stamina:9},
-  grandpa:{name:'EPPE',    abbr:'EPP', onball:3, offball:4, power:7,  defense:10, dribble:3, stamina:9},
-  soyjak: {name:'SOYJAK',  abbr:'SOY', onball:4, offball:5, power:9,  defense:7,  dribble:4, stamina:7},
-  elon:   {name:'MUSKPE',  abbr:'MSK', onball:8, offball:10,power:5,  defense:3,  dribble:5, stamina:5},
-  obampe: {name:'OBAMPE',  abbr:'OBM', onball:7, offball:7, power:6,  defense:6,  dribble:5, stamina:5},
-  okeyjak:{name:'OKEYJAK', abbr:'OKJ', onball:6, offball:6, power:6,  defense:5,  dribble:7, stamina:6},
-  oldwoj: {name:'OLDJAK',  abbr:'OLD', onball:3, offball:4, power:9,  defense:9,  dribble:3, stamina:8},
-  pdidpe: {name:'PDIDPE',  abbr:'PDP', onball:9, offball:7, power:5,  defense:3,  dribble:9, stamina:3},
-  sadjak: {name:'SADJAK',  abbr:'SAD', onball:5, offball:6, power:6,  defense:7,  dribble:5, stamina:7},
-  wojak:  {name:'WOJAK',   abbr:'WOJ', onball:6, offball:6, power:6,  defense:6,  dribble:6, stamina:6},
-  chad:   {name:'CHAD',    abbr:'CHD', onball:7, offball:6, power:9,  defense:4,  dribble:5, stamina:5}
+  pepe:   {name:'PEPE',     abbr:'PEP', arch:'Speedster-Dribbler', pace:18, def:10, sta:13, drb:19, pow:12, div:16, grab:48},
+  trumpe: {name:'TRUMPE',   abbr:'TRU', arch:'Powerhouse',         pace:9,  def:16, sta:16, drb:11, pow:20, div:12, grab:50},
+  doomer: {name:'RUGGEDJAK',abbr:'DJK', arch:'Powerhouse',         pace:12, def:13, sta:15, drb:12, pow:19, div:12, grab:49},
+  boomer: {name:'ALEX',     abbr:'ALX', arch:'Attacking Flagship', pace:18, def:13, sta:16, drb:18, pow:18, div:17, grab:48.5},
+  grandpa:{name:'EPPE',     abbr:'EPP', arch:'Defensive Wall',     pace:7,  def:20, sta:17, drb:8,  pow:14, div:9,  grab:52},
+  soyjak: {name:'SOYJAK',   abbr:'SOY', arch:'Power-Defense',      pace:10, def:17, sta:15, drb:11, pow:18, div:10, grab:51},
+  elon:   {name:'MUSKPE',   abbr:'MSK', arch:'Speedster',          pace:20, def:9,  sta:14, drb:16, pow:13, div:18, grab:48},
+  obampe: {name:'OBAMPE',   abbr:'OBM', arch:'All-rounder',        pace:15, def:14, sta:14, drb:14, pow:14, div:13, grab:49},
+  okeyjak:{name:'OKEYJAK',  abbr:'OKJ', arch:'All-rounder',        pace:13, def:13, sta:14, drb:15, pow:13, div:11, grab:49},
+  oldwoj: {name:'OLDJAK',   abbr:'OLD', arch:'Defensive Wall',     pace:8,  def:19, sta:16, drb:9,  pow:16, div:9,  grab:52},
+  pdidpe: {name:'PDIDPE',   abbr:'PDP', arch:'Dribbler',           pace:17, def:10, sta:12, drb:20, pow:13, div:14, grab:48},
+  sadjak: {name:'SADJAK',   abbr:'SAD', arch:'All-rounder',        pace:12, def:15, sta:15, drb:12, pow:13, div:11, grab:50},
+  wojak:  {name:'WOJAK',    abbr:'WOJ', arch:'All-rounder',        pace:14, def:14, sta:14, drb:14, pow:14, div:12, grab:49},
+  chad:   {name:'CHAD',     abbr:'CHD', arch:'Power-pace',         pace:17, def:12, sta:14, drb:15, pow:19, div:16, grab:48}
 };
-function paceOf(c){ const s=STATS[c]; return s.onball+s.offball; }   // derived display value, not assigned
+function paceOf(c){ return STATS[c].pace; }                          // Pace is now a front stat
+function overallOf(c){ const s=STATS[c]; return s.pace+s.def+s.sta+s.drb+s.pow+s.div; }   // /120 = sum of the six front stats
+// split Pace into on-ball + off-ball that sum EXACTLY to pace; dribblers lean on-ball, low-dribble lean off-ball
+function speedSplit(c){ const s=STATS[c];
+  let on=Math.round(s.pace*0.5 + (s.drb-13)*0.18);
+  on=Math.max(1, Math.min(s.pace-1, on));
+  return { on:on, off:s.pace-on }; }
+// the ONE steal-contest probability the card % AND the in-game contest both read (def vs drb, /20 scale)
+function stealChance(defv, drbv){ return clamp(STEAL_BASE + (defv-drbv)*STEAL_WEIGHT, STEAL_MIN, STEAL_MAX); }
+const CONTEST_AVG=14;   // reference opponent (roster avg def/drb) so the card % is a single readable number
+function cardTacklePct(c){ return Math.round(stealChance(STATS[c].def, CONTEST_AVG)*100); }       // this card tackling an average dribbler
+function cardHoldPct(c){ return Math.round((1-stealChance(CONTEST_AVG, STATS[c].drb))*100); }      // this card retaining vs an average defender
 // ---- Locker roster meta. NOT stat data (stats come ONLY from STATS — single source of truth). ----
 // `arch` = archetype label (per BASED_CUP_STAT_DESIGN.md). `owned` is the collection-ready seam:
 // true for everyone now; the carousel reads isOwned() per character so cosmetic rarity / packs can
 // slot in later WITHOUT re-architecting. Order = carousel order (pace-leaning → wall).
 const ROSTER=['pepe','elon','pdidpe','obampe','chad','wojak','okeyjak','sadjak','doomer','boomer','soyjak','trumpe','grandpa','oldwoj'];
-const CHAR_META={
-  pepe:{arch:'Speedster-Dribbler'}, elon:{arch:'Speedster'},     pdidpe:{arch:'Dribbler'},
-  obampe:{arch:'All-Rounder'},      chad:{arch:'Power-Pace'},    wojak:{arch:'All-Rounder'},
-  okeyjak:{arch:'All-Rounder'},     sadjak:{arch:'All-Rounder'}, doomer:{arch:'Powerhouse'},
-  boomer:{arch:'Wall'},             soyjak:{arch:'Power-Defense'},trumpe:{arch:'Powerhouse'},
-  grandpa:{arch:'Wall'},            oldwoj:{arch:'Def. Powerhouse'}
-};
-function archetypeOf(c){ return (CHAR_META[c]&&CHAR_META[c].arch)||'All-Rounder'; }
+function archetypeOf(c){ return (STATS[c]&&STATS[c].arch)||'All-rounder'; }   // archetype lives in STATS now (single source)
 function isOwned(c){ return true; }   // collection seam — all owned for now; locker honours this per character
 let equippedChar='pepe';   // the ACTIVE character chosen in the Locker; every match flow uses it (set via setEquipped)
 let _equipSynced=false;    // one-shot guard for the cross-device equipped pull
 // stat -> movement-speed mapping (b56): widened from the old 4.2 + stat*0.16 (floor dominated, ~6% felt gap).
 // Lower floor + ~3x slope so on/off and char-to-char pace are clearly FELT (arcadey). Pivots ~stat 6 ≈ old mid-pace.
-const SPEED_FLOOR=2.1, SPEED_SLOPE=0.50;
-function statDerived(c){ const s=STATS[c]; return {
-  maxOn:  SPEED_FLOOR + s.onball*SPEED_SLOPE,    // movement speed WHILE possessing the ball
-  maxOff: SPEED_FLOOR + s.offball*SPEED_SLOPE,   // movement speed WITHOUT the ball
-  kickPow: 9 + s.power*0.9,               // shot power — charge + power stat ONLY (never velocity)
-  stamDrain: 0.018 - s.stamina*0.0011,    // higher stamina drains slower
-  stamRegen: 0.004 + s.stamina*0.0004,
-  defense: s.defense, dribble: s.dribble }; }
+const SPEED_FLOOR=2.1, SPEED_SLOPE=0.50;   // applied to the on/off split (~/10 each), so speeds stay calibrated
+const KICK_BASE=3, KICK_SLOPE=0.75;        // kickPow = 3 + power(/20)*0.75 -> ~12..18 (same shot feel as the old /10 model)
+const STAM_DRAIN_A=0.024, STAM_DRAIN_K=0.001;     // /20 stamina -> sprint drain (sta12 ~.012 .. sta17 ~.007)
+const STAM_REGEN_A=0.0012, STAM_REGEN_K=0.0004;
+const GRAB_BASE=48;                        // fallback grab radius
+function statDerived(c){ const s=STATS[c], sp=speedSplit(c); return {
+  maxOn:  SPEED_FLOOR + sp.on*SPEED_SLOPE,       // on-ball move speed (from the derived split of Pace)
+  maxOff: SPEED_FLOOR + sp.off*SPEED_SLOPE,      // off-ball move speed
+  kickPow: KICK_BASE + s.pow*KICK_SLOPE,         // shot power — charge + power stat ONLY (never velocity)
+  stamDrain: STAM_DRAIN_A - s.sta*STAM_DRAIN_K,  // higher stamina drains slower
+  stamRegen: STAM_REGEN_A + s.sta*STAM_REGEN_K,
+  defense: s.def, dribble: s.drb, grab: s.grab,  // grab = per-card grab radius (48-52)
+  onball: sp.on, offball: sp.off }; }
 const imgFor=c=> IMG[c]||imgP;
 const BALL_R=13;
 const SPRINT_MULT=1.55;
 // ---- Stat-model tuning (Phase 2, b55) — easily tweakable. grabCap is NOT here (stays constant 48). ----
 const STEAL_BASE=0.30;        // per-contest steal chance when defender.defense == carrier.dribble (even match)
-const STEAL_WEIGHT=0.06;      // +/- chance per point of (defender.defense - carrier.dribble)
+const STEAL_WEIGHT=0.035;     // +/- chance per point of (defender.def - carrier.drb); halved for the /20 stat scale (b74)
 const STEAL_MIN=0.05, STEAL_MAX=0.85;     // clamp on the contest chance (never a guaranteed strip, never 0)
 const STEAL_TRY_GAP=22;       // frames between contest attempts during sustained box overlap (~0.37s) — not spammable
 const STEAL_COOLDOWN=40;      // frames of grace after a successful steal (~0.67s) — prevents instant steal-back ping-pong
-const DRIBBLE_GLUE_MIN=0.30, DRIBBLE_GLUE_MAX=0.55;   // glueBall tightness mapped from dribble 1..10 (old fixed value was 0.40)
-const DEF_CLOSE_BONUS=0.06;   // off-ball speed bonus per defense point when chasing the ball carrier (modest closing speed)
+const DRIBBLE_GLUE_MIN=0.30, DRIBBLE_GLUE_MAX=0.55;   // glueBall tightness mapped from dribble /20 (b74)
+const DEF_CLOSE_BONUS=0.03;   // off-ball speed bonus per defense point when chasing the carrier; halved for the /20 scale (b74)
 const MATCH_TIME=60;              // 1:00 per half (goals)
 const KEEPAWAY_TIME=90;          // keep-away is a single 1:30 period (no half-time)
 function matchLen(){ return gameMode==='keepaway' ? KEEPAWAY_TIME : MATCH_TIME; }
@@ -209,7 +223,7 @@ function mkPlayer(x,y,who,char){ const d=statDerived(char);
   return {x,y,vx:0,vy:0,who,char,face:who==='p'?1:-1,
     kickCD:0,boost:0, aim: who==='p'?0:Math.PI, stamina:1, sprinting:false, charge:0, charging:false,
     maxOn:d.maxOn, maxOff:d.maxOff, kickPow:d.kickPow, stamDrain:d.stamDrain, stamRegen:d.stamRegen,
-    defense:d.defense, dribble:d.dribble}; }
+    defense:d.defense, dribble:d.dribble, grab:d.grab}; }
 function reset(concededBy){
   const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
   players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };
@@ -646,7 +660,7 @@ function applyMoveAI(pl,ax,ay,sprint){
 }
 
 // ---- possession: ball softly sticks to the controller (dribble & spin) ----
-function grabCap(pl){ return PLAYER_R+BALL_R+11; }  // identical control box for both characters — no steal/retain advantage
+function grabCap(pl){ return (pl&&pl.grab)||GRAB_BASE; }  // b74: per-card grab radius (48-52), a VISIBLE stat — the one place the hitbox varies (tightly)
 // keep-away: shoot it off the goal frame, win it back before the opponent touches it -> bonus seconds
 let rebSeq=0, rebLastSide='', rebSeen=0;   // rebound event counter, streamed so the guest can show the toast too
 function rebChk(who){
@@ -706,7 +720,7 @@ function glueBall(){
   const hx=pl.x+Math.cos(pl.aim)*hold, hy=pl.y+Math.sin(pl.aim)*hold;
   const px=ball.x, py=ball.y;
   const drb=(pl.dribble!=null?pl.dribble:5);   // higher dribbling = tighter glue (harder to knock loose)
-  const GRAB=DRIBBLE_GLUE_MIN + (drb/10)*(DRIBBLE_GLUE_MAX-DRIBBLE_GLUE_MIN);
+  const GRAB=DRIBBLE_GLUE_MIN + (drb/20)*(DRIBBLE_GLUE_MAX-DRIBBLE_GLUE_MIN);   // dribble is /20 now (b74)
   ball.x+=(hx-ball.x)*GRAB; ball.y+=(hy-ball.y)*GRAB;
   ball.vx=ball.x-px; ball.vy=ball.y-py;
   ball.x=clamp(ball.x,FIELD.l+BALL_R,FIELD.r-BALL_R); // no scoring while dribbling — kick it in
@@ -1952,10 +1966,10 @@ function paintCharCards(){   // kept name for callers; renders the carousel
   const st=$('charStage'); if(st) st.setAttribute('data-char', c);
   const bi=$('charBigImg'); if(bi) bi.src = imgFor(c).src;
   const bn=$('charBigName'); if(bn){ bn.textContent=s.name; bn.style.color=(c==='pepe'?'#69db7c':'#ff8787'); }
-  // compat shim only (the OLD 3-bar carousel) so it doesn't render NaN with the new stats — Phase 3 redesigns this card.
-  if($('csSpeed')) $('csSpeed').style.width=(s.onball+s.offball)*5+'%';   // Pace = on-ball + off-ball (0..20)
-  if($('csPower')) $('csPower').style.width=s.power*10+'%';
-  if($('csStam'))  $('csStam').style.width=s.stamina*10+'%';
+  // compat shim only (the OLD 3-bar carousel, now hidden — the Locker replaced it). Use the graded /20 fields.
+  if($('csSpeed')) $('csSpeed').style.width=(s.pace*5)+'%';
+  if($('csPower')) $('csPower').style.width=(s.pow*5)+'%';
+  if($('csStam'))  $('csStam').style.width=(s.sta*5)+'%';
 }
 function cycleChar(d){ charIdx=(charIdx+d+CHARS.length)%CHARS.length; paintCharCards(); }
 $('charPrev').onclick=()=>cycleChar(-1);
@@ -2033,18 +2047,22 @@ function commitMatchStats(winSide){
 
 let loIdx=0, loBuilt=false;
 function lockerFrontHTML(c){ const s=STATS[c];
-  const bar=(lbl,v)=>'<div class="loStat"><span class="ll">'+lbl+'</span><span class="lb"><b style="width:'+(v*10)+'%"></b></span><span class="lv">'+v+'</span></div>';
+  const bar=(lbl,v)=>'<div class="loStat"><span class="ll">'+lbl+'</span><span class="lb"><b style="width:'+(v*5)+'%"></b></span><span class="lv">'+v+'</span></div>';
   return '<div class="loFace loFront"><div class="loEquipBadge">✓ EQUIPPED</div>'
-    + '<div class="loHead"><div class="loRating"><b>'+paceOf(c)+'</b><span>PACE</span></div><div class="loArchChip">'+archetypeOf(c)+'</div></div>'
+    + '<div class="loHead"><div class="loRating"><b>'+overallOf(c)+'</b><span>OVR</span></div><div class="loArchChip">'+archetypeOf(c)+'</div></div>'
     + '<div class="loArt"><img alt="" src="'+imgFor(c).src+'"></div>'
     + '<div class="loName">'+s.name+'</div>'
-    + '<div class="loStatGrid">'+bar('ON',s.onball)+bar('OFF',s.offball)+bar('POW',s.power)+bar('DEF',s.defense)+bar('DRI',s.dribble)+bar('STA',s.stamina)+'</div></div>'; }
-function lockerBackHTML(c){ const s=STATS[c], r=getCharRecord(c);
+    + '<div class="loStatGrid">'+bar('PAC',s.pace)+bar('DEF',s.def)+bar('STA',s.sta)+bar('DRI',s.drb)+bar('POW',s.pow)+bar('DIV',s.div)+'</div></div>'; }
+function lockerBackHTML(c){ const s=STATS[c], r=getCharRecord(c), sp=speedSplit(c);
   const row=(lbl,val)=>'<div class="loRec"><span>'+lbl+'</span><b>'+val+'</b></div>';
-  return '<div class="loFace loBackFace"><div class="loBackHead"><b>'+s.name+'</b><span>YOUR RECORD</span></div>'
-    + '<div class="loRecGrid">'+row('Wins',r.wins)+row('Losses',r.losses)+row('Goals scored',r.gf)+row('Goals conceded',r.ga)
-    + row('Own goals',r.og)+row('Dribble success',recPct(r.dribbleOk,r.dribbleTry))+row('Tackle success',recPct(r.tackleOk,r.tackleTry))
-    + '</div><div class="loBackNote">Tracked from your matches — fills in as you play.</div></div>'; }
+  return '<div class="loFace loBackFace"><div class="loBackHead"><b>'+s.name+'</b><span>'+archetypeOf(c).toUpperCase()+'</span></div>'
+    + '<div class="loBackSub">CARD DETAIL</div><div class="loRecGrid">'
+    + row('On-ball speed', sp.on) + row('Off-ball speed', sp.off) + row('Grab radius', s.grab)
+    + row('Hold-ball', cardHoldPct(c)+'%') + row('Tackle win', cardTacklePct(c)+'%')
+    + '</div><div class="loBackSub">YOUR RECORD</div><div class="loRecGrid">'
+    + row('Win / loss', r.wins+' / '+r.losses) + row('Goals (for / ag)', r.gf+' / '+r.ga)
+    + row('Own goals', r.og) + row('Dribble %', recPct(r.dribbleOk,r.dribbleTry)) + row('Tackle %', recPct(r.tackleOk,r.tackleTry))
+    + '</div></div>'; }
 function buildLockerCards(){ const track=$('loTrack'); if(!track) return; track.innerHTML='';
   ROSTER.forEach((c,i)=>{ const slot=document.createElement('div'); slot.className='loSlot'+(isOwned(c)?'':' locked');
     slot.setAttribute('data-i',i); slot.setAttribute('data-char',c);

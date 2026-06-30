@@ -19,8 +19,13 @@ Served un-built, `__EXTRA_CHARS__` is a bare identifier → `ReferenceError` →
 for leftover `__[A-Z_]+__` tokens — must be 0** (and 0 placeholder sprites).
 
 ## Sacred laws (never trade these away)
-- **Hitbox equality is sacred.** `grabCap()` is IDENTICAL for ALL characters — no steal/retain edge. Only
-  speed/power/stamina differ (character identity), and stat totals stay balanced (~21).
+- **Graded card model (b74) — grab radius is a VISIBLE, tightly-varying stat, NOT a flat constant.**
+  `grabCap(pl)` returns the card's `grab` (48–52 from the one `STATS` table). Cards are GRADED: 6 front
+  stats /20 → unequal OVERALL /120 (ladder 75–100). Equal-totals fairness was *intentionally* replaced —
+  do NOT revert grab to a constant or re-equalise totals. Keep the grab spread TIGHT (48–52), never dominant;
+  it's shown on the card. Fairness now comes from matchmaking-by-overall (later build). *(History: b47–b73 ran
+  an equal-totals model with a flat grabCap 48; superseded.)*
+- **Single source of truth for stats** — the one `STATS` table; locker AND gameplay read it. Never duplicate stat numbers.
 - **Kick power comes from charge + power-stat ONLY** — never from player velocity (movement can't be exploited into shot power).
 - **No visible hitbox ring** (b47). Pure heads, face-centred; team is read via a soft coloured ground pool.
 - **One source of truth for every money/config number** — coins move ONLY through the `settle_match` RPC; never write the `coins` column directly.

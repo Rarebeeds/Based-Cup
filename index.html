@@ -315,6 +315,11 @@
     background:rgba(255,135,135,.92);border:none;color:#06140b;font-weight:bold;font-size:18px;
     letter-spacing:1px;pointer-events:auto;touch-action:none;box-shadow:0 5px 0 #c92a2a}
   #kickBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #c92a2a}
+  /* b85: dedicated LUNGE button — distinct from KICK, tucked above-left of it so it can't be mis-hit */
+  #lungeBtn{position:absolute;right:calc(max(22px,env(safe-area-inset-right)) + 120px);bottom:54px;width:86px;height:86px;border-radius:50%;
+    background:rgba(120,170,255,.92);border:none;color:#04122a;font-weight:bold;font-size:14px;
+    letter-spacing:1px;pointer-events:auto;touch-action:none;box-shadow:0 5px 0 #2f5fb0}
+  #lungeBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #2f5fb0}
   /* "rotate your phone" nudge — Based Cup plays in landscape */
   #rotateHint{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;padding:30px;
@@ -338,7 +343,22 @@
   @media (max-height:430px){                                    /* shrink controls on short screens so the pitch stays visible */
     #joy{width:122px;height:122px} #stick{width:54px;height:54px}
     #kickBtn{width:98px;height:98px;font-size:15px}
+    #lungeBtn{width:72px;height:72px;font-size:12px;right:calc(max(22px,env(safe-area-inset-right)) + 102px);bottom:46px}
   }
+  /* b85: yellow/red card flash overlay + per-player card mark on the HUD card */
+  #cardFlash{position:fixed;inset:0;z-index:340;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:18px;pointer-events:none;background:rgba(0,0,0,0)}
+  #cardFlash.show{animation:cardTint .9s ease-out}
+  #cardRect{width:120px;height:172px;border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.6);transform:scale(.2) rotate(-22deg);opacity:0}
+  #cardFlash.show #cardRect{animation:cardSlam .9s cubic-bezier(.2,1.3,.4,1) forwards}
+  #cardRect.card-yellow{background:linear-gradient(150deg,#ffe14d,#f5b800);border:2px solid #b88a00}
+  #cardRect.card-red{background:linear-gradient(150deg,#ff5b5b,#d42020);border:2px solid #8c1010}
+  #cardMsg{font-weight:900;letter-spacing:1.5px;font-size:22px;color:#fff;text-shadow:0 3px 0 #000,0 0 22px rgba(0,0,0,.9);opacity:0}
+  #cardFlash.show #cardMsg{animation:cardMsgIn .9s ease-out forwards;animation-delay:.18s}
+  @keyframes cardSlam{0%{transform:scale(.2) rotate(-22deg);opacity:0}45%{transform:scale(1.12) rotate(4deg);opacity:1}70%{transform:scale(.98) rotate(-2deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+  @keyframes cardMsgIn{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+  @keyframes cardTint{0%{background:rgba(0,0,0,0)}30%{background:rgba(0,0,0,.34)}100%{background:rgba(0,0,0,0)}}
+  .pc-card{font-size:13px;margin:0 4px;line-height:1}
   .hide{display:none!important}
   /* $BASED currency icon — a soccer ball with a dollar sign (replaces the coin emoji) */
   .bcoin{display:inline-block;width:1.05em;height:1.05em;vertical-align:-0.18em;
@@ -594,7 +614,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b84 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b85 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -629,18 +649,22 @@
 
   <!-- bottom-corner player interfaces -->
   <div id="pCard" class="pcard hide">
-    <div class="pc-top"><span class="pc-dot dotP"></span><span class="pc-name">PEPE</span></div>
+    <div class="pc-top"><span class="pc-dot dotP"></span><span class="pc-name">PEPE</span><span class="pc-card" id="pCardMark"></span></div>
     <div class="pc-bar"><i id="pStam"></i></div>
   </div>
   <div id="tCard" class="pcard tcard hide">
-    <div class="pc-top"><span class="pc-name">TRUMPE</span><span class="pc-dot dotT"></span></div>
+    <div class="pc-top"><span class="pc-card" id="tCardMark"></span><span class="pc-name">TRUMPE</span><span class="pc-dot dotT"></span></div>
     <div class="pc-bar"><i id="tStam"></i></div>
   </div>
 
   <div id="touch">
     <div id="joy"><div id="stick"></div></div>
+    <button id="lungeBtn">LUNGE</button>
     <button id="kickBtn">KICK</button>
   </div>
+
+  <!-- b85: yellow/red card flash (football-style) -->
+  <div id="cardFlash" class="hide"><div id="cardRect"></div><div id="cardMsg"></div></div>
 
   <div id="rotateHint">
     <div class="ph">📱</div>
@@ -1215,6 +1239,7 @@ function statDerived(c){ const s=STATS[c], sp=speedSplit(c); return {
   stamDrain: STAM_DRAIN_A - s.sta*STAM_DRAIN_K,  // higher stamina drains slower
   stamRegen: STAM_REGEN_A + s.sta*STAM_REGEN_K,
   defense: s.def, dribble: s.drb, grab: s.grab,  // grab = per-card grab radius (48-52)
+  dive: s.div,                                   // b85: DIVING wired -> lunge distance/power (was display-only since b74)
   onball: sp.on, offball: sp.off }; }
 const imgFor=c=> IMG[c]||imgP;
 const BALL_R=13;
@@ -1227,6 +1252,24 @@ const STEAL_TRY_GAP=22;       // frames between contest attempts during sustaine
 const STEAL_COOLDOWN=40;      // frames of grace after a successful steal (~0.67s) — prevents instant steal-back ping-pong
 const DRIBBLE_GLUE_MIN=0.30, DRIBBLE_GLUE_MAX=0.55;   // glueBall tightness mapped from dribble /20 (b74)
 const DEF_CLOSE_BONUS=0.03;   // off-ball speed bonus per defense point when chasing the carrier; halved for the /20 scale (b74)
+// ---- DIVE/LUNGE + FOUL + CARD tuning (b85) — all the key values, named + tweakable. ----
+// Lunge = a short forward dash (right-click / mobile LUNGE button) on top of normal movement, distinct
+// from the kick (charge+power, untouched) and the steal contest (def-vs-drb, untouched). Diving (/20)
+// drives the reach; a player WITHOUT the ball reaches further (a defensive tackle-lunge).
+const LUNGE_DIST_BASE=34;        // dash distance (px) at diving 0
+const LUNGE_DIST_PER_DIV=2.2;    // +px of dash per diving point (/20) -> diving 18 ≈ +40px
+const LUNGE_DEF_BONUS=1.55;      // a lunger WITHOUT the ball (defensive lunge) reaches this much further — tunable
+const LUNGE_FRICTION=0.80;       // per-frame decay of the dash velocity (distance ≈ v0/(1-friction))
+const LUNGE_DURATION=14;         // frames the dash plays out (~0.23s)
+const LUNGE_COOLDOWN=72;         // frames before you can lunge again (~1.2s) — not spammable
+const LUNGE_STAMINA=0.16;        // stamina spent per lunge (0..1 bar) — tunable cost
+const LUNGE_MIN_STAMINA=0.06;    // need at least this much stamina to lunge at all
+// Foul: at lunge contact, did the lunger collect more PLAYER than BALL? Clear, tunable thresholds.
+const FOUL_CONTACT_DIST=PLAYER_R*2+7;   // centre-distance at which two bodies count as "in contact"
+const FOUL_BALL_REACH=PLAYER_R+BALL_R+7;// distance at which the lunger has "reached the ball"
+const FOUL_BALL_MARGIN=12;              // ball must be at least this much CLOSER than the opp body to be a CLEAN ball-win (else FOUL)
+// CPU: the AI can lunge to tackle (and can mistime it into a foul), reusing its existing decision logic.
+const LUNGE_AI_RANGE=120;        // px: CPU only considers a tackle-lunge within this range of the ball
 const MATCH_TIME=60;              // 1:00 per half (goals)
 const KEEPAWAY_TIME=90;          // keep-away is a single 1:30 period (no half-time)
 function matchLen(){ return gameMode==='keepaway' ? KEEPAWAY_TIME : MATCH_TIME; }
@@ -1292,6 +1335,9 @@ let slowmoCamMode='ball', slowmoCamSide='R';     // 'ball'=follow the ball (long
 let netCamMode='ball', netCamSide='R';           // guest copies, streamed from the host so both see the same framing
 let goalFx=null, shakeAmp=0;    // active explosion + screen-shake amplitude
 let goalSeq=0, goalFxSide='', goalSeen=0;   // streamed goal-event counter (host increments, guest detonates on change)
+// b85: foul/card event — host-authoritative, streamed like goalSeq (host increments + flashes the card + runs the reset; guest mirrors)
+let foulSeq=0, foulSeen=0, foulCardType=0, foulCardSide='';   // counter · 1=yellow 2=red · which side was carded
+let cardFxTimer=null, lungeReq=false;       // card-flash auto-hide timer · pending local lunge request (right-click / mobile button, edge)
 let gameMode='goals', possP=0, possT=0;   // keepaway mode: hold the ball longest
 let half=1, halftime=false;               // two 1-minute halves
 let timeLeft=MATCH_TIME, golden=false, lastTs=0, kickoffLock=0;
@@ -1300,7 +1346,9 @@ function mkPlayer(x,y,who,char){ const d=statDerived(char);
   return {x,y,vx:0,vy:0,who,char,face:who==='p'?1:-1,
     kickCD:0,boost:0, aim: who==='p'?0:Math.PI, stamina:1, sprinting:false, charge:0, charging:false,
     maxOn:d.maxOn, maxOff:d.maxOff, kickPow:d.kickPow, stamDrain:d.stamDrain, stamRegen:d.stamRegen,
-    defense:d.defense, dribble:d.dribble, grab:d.grab}; }
+    defense:d.defense, dribble:d.dribble, grab:d.grab, dive:d.dive,
+    lvx:0, lvy:0, lunging:0, lungeCD:0, lungeFoulDone:false,  // b85: lunge dash state
+    cards:0, out:false}; }                                    // b85: cards (0=clean,1=yellow,2=red) + removed-from-match flag
 function reset(concededBy){
   const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
   players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };
@@ -1313,6 +1361,7 @@ function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; ti
   clearTimeout(htTimer); hideHalftime();
   setMeta(''); updateHUD(); reset(); goalLock=0;
   goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
+  foulSeq=0; foulSeen=0; foulCardType=0; foulCardSide=''; lungeReq=false;   // b85: fresh card state each match
   slowmoT=0; netSlowmo=false; motionScale=1; camZoom=1; camFocusX=W/2; camFocusY=H/2;
   slowmoCamMode='ball'; slowmoCamSide='R'; netCamMode='ball'; netCamSide='R';   // reset goal-juice + slow-mo + camera each match
   startMatchStats();}   // BUILD 2: fresh per-character stat accumulator for this match
@@ -1342,7 +1391,10 @@ function updateHUD(){
   const cl=document.getElementById('clock');
   cl.textContent= golden?'GG':fmtTime(timeLeft);
   cl.classList.toggle('low', !golden && timeLeft<=10);
-  if(players){ setStam('pStam',players.p); setStam('tStam',players.t); }
+  if(players){ setStam('pStam',players.p); setStam('tStam',players.t);
+    const cmark=n=>n>=2?'🟥':(n>=1?'🟨':'');                       // b85: show the player's current card on their HUD card
+    const pm=document.getElementById('pCardMark'), tm=document.getElementById('tCardMark');
+    if(pm) pm.textContent=cmark(players.p.cards||0); if(tm) tm.textContent=cmark(players.t.cards||0); }
   const pt=document.getElementById('pingTag');
   if(pt){ if(netRole && NET.rtt!=null){ pt.classList.remove('hide');
       const r = NET.rttShown!=null?NET.rttShown:NET.rtt;
@@ -1371,7 +1423,7 @@ function toLogical(e){const r=cv.getBoundingClientRect();
 cv.addEventListener('mousemove',e=>{const p=toLogical(e);mouse.x=p.x;mouse.y=p.y;mouse.active=true;});
 cv.addEventListener('mouseenter',()=>{mouse.active=true;});
 cv.addEventListener('mouseleave',()=>{mouse.active=false;});
-cv.addEventListener('mousedown',e=>{if(e.button===0)keys['kick']=true;});
+cv.addEventListener('mousedown',e=>{ if(e.button===0)keys['kick']=true; else if(e.button===2){ lungeReq=true; e.preventDefault(); } });   // b85: RIGHT-CLICK = lunge (edge); left-click still kicks
 addEventListener('mouseup',e=>{if(e.button===0)keys['kick']=false;});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -1397,6 +1449,9 @@ const kickBtn=document.getElementById('kickBtn');
 kickBtn.addEventListener('touchstart',e=>{touchKick=true;e.preventDefault()},{passive:false});
 kickBtn.addEventListener('touchend',e=>{touchKick=false;e.preventDefault()},{passive:false});
 kickBtn.addEventListener('touchcancel',e=>{touchKick=false;e.preventDefault()},{passive:false});
+// b85: dedicated mobile LUNGE button — distinct from KICK; sets the same edge-triggered request
+const lungeBtn=document.getElementById('lungeBtn');
+if(lungeBtn){ lungeBtn.addEventListener('touchstart',e=>{ lungeReq=true; e.preventDefault(); },{passive:false}); }
 
 // ---- Audio (all synthesized — no external files) ----
 let actx=null, master=null, NOISE=null, muted=false;
@@ -1613,6 +1668,7 @@ function controlPlayer(pl){
   }
   const m=Math.hypot(ax,ay); if(m>1){ax/=m;ay/=m;}
   const sprint = pl.who==='p' ? (keys['shiftleft']||keys['shift']||touchSprint) : keys['shiftright'];
+  if(pl.who==='p' && lungeReq){ lungeReq=false; tryLunge(pl); }   // b85: local human (host/offline) lunges; guest routes via sendGuestInput
   applyMove(pl,ax,ay,sprint);
   let held=false;
   if(pl.who==='p'&&(keys['kick']||touchKick))held=true;
@@ -1635,6 +1691,7 @@ function applyMove(pl,ax,ay,sprint){
   if(Math.abs(pl.vx)>0.3) pl.face=pl.vx>0?1:-1;
   confineRound(pl,PLAYER_R);
   if(pl.kickCD>0)pl.kickCD--; pl.boost*=0.9;
+  stepLunge(pl);                       // b85: apply the lunge dash on top of normal movement
 }
 // hold to charge, release to shoot. Power comes from the charge + the character's
 // power stat ONLY — never from how fast the player is moving.
@@ -1663,10 +1720,10 @@ function tryKick(pl, chargeAmt){
 function aiControl(pl){
   // Difficulty tiers escalate on FIVE axes, not one: reaction time, shot aim+accuracy, corner targeting,
   // defence/interception, and turn-to-turn unpredictability. (AI decision-logic only — stats/grabCap untouched.)
-  const D={easy:  {spd:.72, err:48, kick:.50, react:13, aimErr:.40, corner:.15, lead:.04, defend:.15},
-           normal:{spd:.90, err:26, kick:.78, react:5,  aimErr:.16, corner:.62, lead:.16, defend:.55},
-           hard:  {spd:1.0, err:10, kick:.95, react:1,  aimErr:.05, corner:.95, lead:.30, defend:1.0}}[diff]
-        || {spd:.90,err:26,kick:.78,react:5,aimErr:.16,corner:.62,lead:.16,defend:.55};
+  const D={easy:  {spd:.72, err:48, kick:.50, react:13, aimErr:.40, corner:.15, lead:.04, defend:.15, lunge:.010},
+           normal:{spd:.90, err:26, kick:.78, react:5,  aimErr:.16, corner:.62, lead:.16, defend:.55, lunge:.030},
+           hard:  {spd:1.0, err:10, kick:.95, react:1,  aimErr:.05, corner:.95, lead:.30, defend:1.0, lunge:.055}}[diff]
+        || {spd:.90,err:26,kick:.78,react:5,aimErr:.16,corner:.62,lead:.16,defend:.55,lunge:.030};
   const ka=(gameMode==='keepaway');
   if(pl.aiTick==null){ pl.aiTick=0; pl.aiLastOwner='?'; pl.aiCorner=1; pl.aiLane=0; pl.aiTgt=null; }
   // pick a fresh PLAN each new possession (and rarely mid-possession) so the AI isn't identical every kickoff
@@ -1701,6 +1758,11 @@ function aiControl(pl){
   const hd=Math.hypot(players.p.x-pl.x, players.p.y-pl.y);
   const sprint = pl.stamina>0.25 && (dd>175 || ball.owner==='t');
   applyMoveAI(pl,ax*D.spd, ay*D.spd, sprint);
+  // b85: CPU tackle-lunge — when it doesn't have the ball and the ball is in lunge range, occasionally dash for it.
+  // Aimed at the ball so a good lunge wins it cleanly; a mistimed one collects the player = a foul (CPU can be carded too).
+  if(pl.lungeCD<=0 && pl.lunging<=0 && kickoffLock===0 && goalLock<=0 && ball.owner!=='t' && dd<LUNGE_AI_RANGE && Math.random()<D.lunge){
+    pl.aim=Math.atan2(ball.y-pl.y, ball.x-pl.x); tryLunge(pl);
+  }
   if(kickoffLock>0) kickoffLock--;
   if(ball.owner==='t'){
     if(ka){                             // keep-away: only poke it away under pressure, aimed at centre (never a goal mouth)
@@ -1734,6 +1796,96 @@ function applyMoveAI(pl,ax,ay,sprint){
   if(Math.abs(pl.vx)>0.3) pl.face=pl.vx>0?1:-1;
   confineRound(pl,PLAYER_R);
   if(pl.kickCD>0)pl.kickCD--; pl.boost*=0.9;
+  stepLunge(pl);                       // b85: CPU lunge dash too
+}
+
+// ---- DIVE/LUNGE mechanic + FOUL detection + YELLOW/RED cards (b85). Host-authoritative; the guest
+//      mirrors cards/resets via the snapshot (same proven pattern as goalSeq). The lunge is mode-agnostic;
+//      the foul/card removal uses ONE general team rule so 2v2 slots in later with no new foul code. ----
+function stepLunge(pl){
+  if(pl.lungeCD>0) pl.lungeCD--;
+  if(pl.lunging>0){
+    pl.x += pl.lvx*motionScale; pl.y += pl.lvy*motionScale;   // dash advances on TOP of normal movement (bypasses the speed cap)
+    pl.lvx*=LUNGE_FRICTION; pl.lvy*=LUNGE_FRICTION;
+    if(Math.abs(pl.lvx)>0.3) pl.face = pl.lvx>0?1:-1;
+    pl.lunging--;
+    confineRound(pl,PLAYER_R);
+  }
+}
+// fire a lunge: a forward dash in the aim direction, distance scaled by DIVING; defenders (no ball) reach further.
+function tryLunge(pl){
+  if(!pl || pl.out) return;
+  if(pl.lungeCD>0 || pl.lunging>0) return;
+  if(kickoffLock>0 || goalLock>0 || halftime) return;
+  if(pl.stamina < LUNGE_MIN_STAMINA) return;
+  pl.stamina = clamp(pl.stamina - LUNGE_STAMINA, 0, 1);   // small, tunable stamina cost
+  pl.lungeCD = LUNGE_COOLDOWN; pl.lunging = LUNGE_DURATION; pl.lungeFoulDone = false;
+  const defender = (ball.owner !== pl.who);               // not holding the ball -> defensive lunge -> reaches further
+  const div = (pl.dive!=null ? pl.dive : 10);
+  let dist = LUNGE_DIST_BASE + div*LUNGE_DIST_PER_DIV;    // DIVING drives the reach
+  if(defender) dist *= LUNGE_DEF_BONUS;
+  const v0 = dist*(1-LUNGE_FRICTION);                     // initial dash velocity so the decay covers ≈ dist
+  pl.lvx = Math.cos(pl.aim)*v0; pl.lvy = Math.sin(pl.aim)*v0;
+  try{ sfxGrunt(pl.char); }catch(e){}
+}
+// GENERAL team model (1v1: each player IS their team). 2v2 later just expands teamPlayers/teamOf — foul code unchanged.
+function teamOf(pl){ return pl.who; }
+function teamPlayers(team){ return [players[team]]; }                    // 1v1: one player per team
+function teamAlive(team){ return teamPlayers(team).some(p=>p && !p.out); }
+function otherTeam(team){ return team==='p'?'t':'p'; }                   // 1v1 mapping; 2v2 returns the opposing team id
+// run every authoritative frame: did any lunging player make contact? (host/local only — a foul rebuilds players)
+function processLunges(){
+  if(!players) return;
+  const list=[players.p]; if(oppActive) list.push(players.t);
+  for(const pl of list){
+    if(pl && pl.lunging>0 && !pl.lungeFoulDone){ if(checkLungeFoul(pl)) return; }
+  }
+}
+// at contact: more PLAYER than BALL = foul on the lunger; reaching the BALL first = a clean, legal win.
+function checkLungeFoul(pl){
+  if(!oppActive || pl.out) return false;
+  const opp=players[pl.who==='p'?'t':'p'];
+  if(!opp || opp.out) return false;
+  const dOpp=Math.hypot(pl.x-opp.x, pl.y-opp.y);
+  const dBall=Math.hypot(pl.x-ball.x, pl.y-ball.y);
+  const wonBall = dBall<FOUL_BALL_REACH && dBall <= dOpp-FOUL_BALL_MARGIN;   // reached the ball, clearly closer than the body
+  if(wonBall){
+    pl.lungeFoulDone=true;
+    if(ball.owner!==pl.who){ if(ball.owner) ball.oppTouch=true; ball.owner=pl.who; ball.stealCD=STEAL_COOLDOWN; ball.kickLock=0; }  // legal tackle wins it
+    return false;
+  }
+  if(dOpp<FOUL_CONTACT_DIST){          // collected the body (not the ball) -> FOUL on the lunger
+    pl.lungeFoulDone=true;
+    issueFoul(pl, opp);
+    return true;                        // players were rebuilt by the reset — stop processing this frame
+  }
+  return false;
+}
+// host/local: first foul = yellow, second = red. A red REMOVES the player; a team forfeits only at 0 players (general rule).
+function issueFoul(lunger, fouled){
+  if(goalLock>0 || lunger.out) return;
+  lunger.cards=(lunger.cards||0)+1;
+  const red = lunger.cards>=2;
+  foulSeq++; foulCardType=red?2:1; foulCardSide=lunger.who;               // streamed so the guest flashes the same card
+  showCard(red?'red':'yellow', STATS[lunger.char].name);
+  showToast((red?'🟥 RED — ':'🟨 YELLOW — ')+STATS[lunger.char].name+(red?' sent off!':' (foul)'), red?'#ff6b6b':'#ffd43b');
+  if(red){
+    lunger.out=true;
+    const myTeam=teamOf(lunger);
+    if(!teamAlive(myTeam)){             // GENERAL RULE: team reaches 0 players -> it forfeits, the other team wins.
+      endGame(otherTeam(myTeam));       // 1v1: the only path — red -> 0 -> opponent wins. host endGame streams st:win; guest mirrors.
+      return;
+    }
+    // (2v2 later: team still has players -> match continues; fall through to the foul reset below.)
+  }
+  foulReset(fouled.who);               // foul that doesn't end the match: kickoff reset, ball to the FOULED side
+}
+// reuse the EXISTING goal-kickoff reset; possession to the fouled side (like the conceder after a goal). Cards persist across it.
+function foulReset(fouledSide){
+  const pc=players.p.cards||0, tc=players.t.cards||0, po=!!players.p.out, to=!!players.t.out;
+  reset(fouledSide);                   // SAME flow as a post-goal kickoff (reset() rebuilds players + nudges the ball to the conceder/fouled side)
+  players.p.cards=pc; players.t.cards=tc; players.p.out=po; players.t.out=to;   // re-stamp the persistent card state the rebuild cleared
+  goalLock=Math.max(goalLock,40);      // brief settle beat (clock pauses, like after a goal)
 }
 
 // ---- possession: ball softly sticks to the controller (dribble & spin) ----
@@ -1901,6 +2053,16 @@ function onTimeUp(){
 function showToast(txt,col){const el=document.getElementById('toast');
   el.textContent=txt; el.style.color='#fff';
   el.style.textShadow=`0 4px 0 #000,0 0 34px ${col}`; toastT=60;}
+// b85: juiced yellow/red card flash (like real football) — a card slams onto the screen, holds, then fades.
+function showCard(type,name){
+  const ov=$('cardFlash'), rect=$('cardRect'), msg=$('cardMsg'); if(!ov) return;
+  rect.className = 'card-'+type;
+  msg.textContent = (type==='red'?'RED CARD':'YELLOW CARD') + ' · ' + name + (type==='red'?' SENT OFF':'');
+  ov.classList.remove('hide','show'); void ov.offsetWidth; ov.classList.add('show');   // restart the CSS animation
+  clearTimeout(cardFxTimer);
+  cardFxTimer=setTimeout(()=>{ ov.classList.add('hide'); ov.classList.remove('show'); }, type==='red'?2600:1700);
+  try{ if(type==='red') sfxBoom(); else sfxKick(); }catch(e){}
+}
 
 function endGame(who){
   state='win';
@@ -2271,7 +2433,12 @@ function drawAim(pl,col,hasBall){
   ctx.restore();
 }
 function drawPlayer(pl,img,col){
+  if(pl.out) return;                  // b85: a red-carded player has left the pitch (2v2 path; in 1v1 the match has ended)
   const R=PLAYER_R;
+  // b85: lunge whoosh — a short motion streak behind a dashing player (visual only)
+  if(pl.lunging>0){ const a=Math.atan2(pl.lvy,pl.lvx), len=R*2.2;
+    ctx.save(); ctx.globalAlpha=0.32; ctx.strokeStyle=col; ctx.lineCap='round'; ctx.lineWidth=R*1.1;
+    ctx.beginPath(); ctx.moveTo(pl.x-Math.cos(a)*len, pl.y-Math.sin(a)*len); ctx.lineTo(pl.x, pl.y); ctx.stroke(); ctx.restore(); }
   // soft team-coloured pool on the ground — the ONLY team marker now (no hard hitbox ring),
   // so same-character matchups stay readable while the collision itself is invisible.
   ctx.save();
@@ -2345,6 +2512,7 @@ function loop(ts){
         if(netRole==='host') controlNet(players.t);
         else if(oppActive){ if(mode==='2p')controlPlayer(players.t); else aiControl(players.t); }
         footsteps(players.p); if(oppActive) footsteps(players.t);
+        processLunges();          // b85: detect lunge contact -> clean ball-win or foul/card/reset (authoritative; guest mirrors)
         separatePlayers();
         updatePossession();
         if(goalLock<=0 && !golden){ if(ball.owner==='p') possP+=dt; else if(ball.owner==='t') possT+=dt; }
@@ -3243,7 +3411,20 @@ function resetWager(){ wager={amount:0, oppId:null, matchId:null, settled:false}
 function updatePotTag(){ const el=$('potTag'); if(!el) return;
   if(wager.amount>0){ el.innerHTML=coinIcon()+' POT '+(wager.amount*2)+' $BASED'; el.classList.remove('hide'); }
   else el.classList.add('hide'); }
-function gpInit(){ gp = players? {x:players.t.x,y:players.t.y,vx:0,vy:0} : {x:W*0.73,y:H/2,vx:0,vy:0}; }
+function gpInit(){ gp = players? {x:players.t.x,y:players.t.y,vx:0,vy:0,lvx:0,lvy:0,lunging:0,lungeCD:0} : {x:W*0.73,y:H/2,vx:0,vy:0,lvx:0,lvy:0,lunging:0,lungeCD:0}; }
+// b85: guest predicts its OWN lunge locally (mirrors tryLunge on the host) so the dash is instant; the host stays authoritative and reconciliation keeps it aligned.
+function guestPredictLunge(){
+  if(!gp || gp.lunging>0 || gp.lungeCD>0) return;
+  if(kickoffLock>0 || goalLock>0 || halftime) return;
+  const t=players.t; if(!t) return;
+  if(t.stamina!=null && t.stamina<LUNGE_MIN_STAMINA) return;
+  gp.lungeCD=LUNGE_COOLDOWN; gp.lunging=LUNGE_DURATION;
+  const defender=(ball.owner!=='t');
+  const div=(t.dive!=null?t.dive:10);
+  let dist=LUNGE_DIST_BASE+div*LUNGE_DIST_PER_DIV; if(defender) dist*=LUNGE_DEF_BONUS;
+  const v0=dist*(1-LUNGE_FRICTION);
+  gp.lvx=Math.cos(guestAim)*v0; gp.lvy=Math.sin(guestAim)*v0;
+}
 function predictGuestSelf(){
   if(!gp) gpInit();
   let ax=0,ay=0;
@@ -3262,6 +3443,9 @@ function predictGuestSelf(){
   gp.vx+=ax*ACC; gp.vy+=ay*ACC;
   const sp=Math.hypot(gp.vx,gp.vy); if(sp>MAX){gp.vx=gp.vx/sp*MAX; gp.vy=gp.vy/sp*MAX;}
   gp.vx*=0.84; gp.vy*=0.84; gp.x+=gp.vx*motionScale; gp.y+=gp.vy*motionScale;
+  // predicted lunge dash (mirrors stepLunge on the host) so our own lunge is instant; the host's snapshot still reconciles us
+  if(gp.lungeCD>0) gp.lungeCD--;
+  if(gp.lunging>0){ gp.x+=gp.lvx*motionScale; gp.y+=gp.lvy*motionScale; gp.lvx*=LUNGE_FRICTION; gp.lvy*=LUNGE_FRICTION; gp.lunging--; }
   confineRound(gp,PLAYER_R);
   // Reconcile against the FRESHEST authoritative position (not the interpolation-delayed
   // one) so there's no constant backward pull. Ease gently when close; firm up only when
@@ -3272,7 +3456,7 @@ function predictGuestSelf(){
     if(err>200){ gp.x=auth.x; gp.y=auth.y; gp.vx=0; gp.vy=0; }   // only hard-snap on a real desync (goal reset)
     else { const k = err>60 ? 0.16 : 0.05; gp.x+=ex*k; gp.y+=ey*k; }
   }
-  t.x=gp.x; t.y=gp.y;
+  t.x=gp.x; t.y=gp.y; t.lunging=gp.lunging; t.lvx=gp.lvx; t.lvy=gp.lvy;   // mirror the predicted lunge for the whoosh visual
   // aim arrow: on touch follow the joystick (no mouse exists — this was the frozen "halfway" arrow);
   // hold the last heading when the stick is centred. Desktop keeps mouse aim.
   if(IS_TOUCH){ if(joyActive && (joyVec.x||joyVec.y)) guestAim=Math.atan2(joyVec.y,joyVec.x); t.aim=guestAim; }
@@ -3692,10 +3876,13 @@ function _beginGameOnline(role){
   showMatchBanner();
 }
 // host applies the guest's streamed input to the right-side player
+let netLungePrev=false;
 function controlNet(pl){
   const gi=NET.guestInput;
-  applyMove(pl, gi.ax, gi.ay, gi.sprint);
   pl.aim = gi.aim;
+  if(gi.lunge && !netLungePrev){ tryLunge(pl); }   // b85: edge-trigger the guest's lunge on the host (authoritative; foul check follows)
+  netLungePrev = !!gi.lunge;
+  applyMove(pl, gi.ax, gi.ay, gi.sprint);
   chargeKick(pl, !!gi.kick);     // host charges/fires from the guest's held button
   netKickPrev = gi.kick;
 }
@@ -3711,9 +3898,10 @@ function sendGuestInput(){
   // when the stick is released) instead of leaving the arrow frozen at the stale mouse position.
   if(IS_TOUCH){ if(joyActive && (joyVec.x||joyVec.y)) guestAim=Math.atan2(joyVec.y,joyVec.x); }
   else guestAim=Math.atan2(mouse.y-t.y, mouse.x-t.x);
+  const lunge=lungeReq; if(lunge){ lungeReq=false; guestPredictLunge(); }   // b85: send the lunge edge to the host + predict it locally so it feels instant
   NET.relay({ input:{ ax, ay, aim:guestAim,
     sprint:!!(keys['shiftleft']||keys['shift']||touchSprint),
-    kick:!!(keys['kick']||touchKick) } });
+    kick:!!(keys['kick']||touchKick), lunge:lunge } });
 }
 // host streams the authoritative snapshot to the guest
 function sendState(extra){
@@ -3725,7 +3913,8 @@ function sendState(extra){
     p:{x:R(p.x),y:R(p.y),aim:R2(p.aim),face:p.face,char:p.char,stam:R2(p.stamina),ch:R2(p.charge),cg:p.charging?1:0},
     t:{x:R(t.x),y:R(t.y),aim:R2(t.aim),face:t.face,char:t.char,stam:R2(t.stamina),ch:R2(t.charge),cg:t.charging?1:0},
     b:{x:R(ball.x),y:R(ball.y),roll:R2(ball.roll||0),dir:R2(ball.dir||0),net:ball.netSide||0,own:ball.owner||0},
-    s:[score.p,score.t], tl:R1(timeLeft), gl:golden, pp:R1(possP), tp:R1(possT), gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide, gq:goalSeq, gsd:goalFxSide, sm:slowmoT>0?1:0, cm:slowmoCamMode==='goal'?1:0, cs:slowmoCamSide
+    s:[score.p,score.t], tl:R1(timeLeft), gl:golden, pp:R1(possP), tp:R1(possT), gm:gameMode, hf:half, ht:halftime?1:0, st:(extra&&extra.st)||'play', win:(extra&&extra.win)||0, rq:rebSeq, rs:rebLastSide, gq:goalSeq, gsd:goalFxSide, sm:slowmoT>0?1:0, cm:slowmoCamMode==='goal'?1:0, cs:slowmoCamSide,
+    fq:foulSeq, fcd:foulCardType, fws:foulCardSide, pca:players.p.cards||0, tca:players.t.cards||0, po:players.p.out?1:0, to:players.t.out?1:0   // b85: foul/card event + per-player card counts + removed flags
   }});
 }
 // guest buffers snapshots and renders in the past, gliding between them.
@@ -3769,6 +3958,12 @@ function applyNetState(){
   if(latest.gm) gameMode=latest.gm; if(latest.pp!=null) possP=latest.pp; if(latest.tp!=null) possT=latest.tp;
   if(latest.rq!=null && latest.rq>rebSeen){ rebSeen=latest.rq; showToast('🎯 REBOUND +3s!', latest.rs==='p'?'#69db7c':'#ff8787'); }
   if(latest.gq!=null && latest.gq>goalSeen){ goalSeen=latest.gq; triggerGoalFx(latest.gsd||'L'); }   // detonate the goal explosion in sync with the host
+  // b85: mirror the host's authoritative card counts / removed flags, and flash the card when a new foul lands
+  if(latest.pca!=null) players.p.cards=latest.pca; if(latest.tca!=null) players.t.cards=latest.tca;
+  players.p.out=!!latest.po; players.t.out=!!latest.to;
+  if(latest.fq!=null && latest.fq>foulSeen){ foulSeen=latest.fq;
+    const side=latest.fws||'p', nm=(players[side]&&STATS[players[side].char])?STATS[players[side].char].name:'';
+    showCard(latest.fcd===2?'red':'yellow', nm); }
   netSlowmo = !!latest.sm;                          // follow the host's slow-mo window (drives our prediction + FX pulldown)
   if(latest.cm!=null) netCamMode = latest.cm?'goal':'ball';   // and the host's cinematic camera framing
   if(latest.cs) netCamSide = latest.cs;

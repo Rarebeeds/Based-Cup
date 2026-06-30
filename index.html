@@ -614,7 +614,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b85 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b86 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -2668,6 +2668,21 @@ async function syncCoins(){
   try{ const {data}=await sb.from('profiles').select('coins').eq('id',sbUser.id).single();
        if(data&&data.coins!=null) setLocalCoins(data.coins); }catch(e){}
 }
+// b86: MONOTONIC profile sync. The `merge_profile` RPC raises xp/wins/losses via GREATEST(), so a
+// stale/empty local context can NEVER lower real cloud progress — this is the fix for the "level
+// resets to 1" bug (level is derived from xp; a destructive 0-write wiped it). Awaited internally
+// with one retry, replacing the old fire-and-forget `.update()`s that let cloud xp lag. Coins are
+// intentionally NOT synced here — they move only through the settle_match RPC (sacred law). Safe
+// no-op until the merge_profile RPC is created in Supabase, and never destructive in the meantime.
+async function pushProfile(){
+  if(!sb || !sbUser || !account) return false;
+  const args={ p_xp:account.xp||0, p_wins:account.wins||0, p_losses:account.losses||0,
+    p_wallet:account.addr||'', p_avatar:avatarOf(account.username)||'' };
+  for(let i=0;i<2;i++){
+    try{ const { error }=await sb.rpc('merge_profile', args); if(!error) return true; }catch(e){}
+  }
+  return false;
+}
 function onlineWagerEnabled(){ return !!(account && !account.guest && sb); }
 
 // ---- per-player stats for achievements (local) ----
@@ -2719,7 +2734,7 @@ function addXp(n){
   if(!account||!n) return;
   account.xp=(account.xp||0)+n;
   const a=accounts(), me=a[account.username.toLowerCase()]; if(me){ me.xp=account.xp; saveAccts(a); }
-  if(sbUser) try{ sb.from('profiles').update({xp:account.xp}).eq('id',sbUser.id); }catch(_){}
+  pushProfile();   // b86: monotonic merge (GREATEST) — never lowers cloud xp; retries instead of fire-and-forget
   refreshAcctBtn();
 }
 
@@ -2762,7 +2777,7 @@ function awardEndOfMatch(win){
   const beforeLvl = levelFromXp(account.xp||0).level;
   if(account){ account.xp=(account.xp||0)+gain;
     const a=accounts(), me=a[account.username.toLowerCase()]; if(me){ me.xp=account.xp; saveAccts(a); } }
-  if(sbUser){ sb.from('profiles').update({xp:account?account.xp:0}).eq('id',sbUser.id); }
+  pushProfile();   // b86: monotonic xp/wins/losses sync (GREATEST) — never lowers, retried (was fire-and-forget)
   // stats + achievements
   const st=getStats(); st.games=(st.games||0)+1; st.goals=(st.goals||0)+myGoals;
   if(win){ st.wins=(st.wins||0)+1; st.streak=(st.streak||0)+1; if((st.streak||0)>(st.maxStreak||0)) st.maxStreak=st.streak;
@@ -2832,7 +2847,7 @@ function recordResult(win){
   if(!account)return; const a=accounts(), me=a[account.username.toLowerCase()];
   if(me){ if(win)me.wins++; else me.losses++; saveAccts(a); account=me; }
   if(ranked) LB.report(account.username, account.addr, win);   // report ranked online matches
-  if(sbUser){ sb.from('profiles').update({wins:account.wins||0, losses:account.losses||0}).eq('id',sbUser.id); }
+  pushProfile();   // b86: monotonic — wins/losses only ever go UP (GREATEST), retried
 }
 
 // digit-only filter for PINs
@@ -2869,13 +2884,19 @@ async function signInOnline(){
   const { data:prof } = await sb.from('profiles').select('username,wallet,avatar,wins,losses,xp,coins').eq('id',uid).single();
   const uname=(prof&&prof.username)||u;
   sbUser={id:uid, username:uname};
-  // mirror into a local account so the rest of the game works offline too
+  // mirror into a local account so the rest of the game works offline too.
+  // b86: take the MAX of local vs cloud for monotonic fields — a stale/0 cloud row must NEVER wipe
+  // good local xp/wins/losses (the old `(prof.xp)||0` clobber caused the level reset). Coins are NOT
+  // maxed (they can legitimately drop via wagers) — keep the cloud-authoritative value.
   const accts=accounts();
-  accts[uname.toLowerCase()]={username:uname, addr:(prof&&prof.wallet)||'', pin,
-    wins:(prof&&prof.wins)||0, losses:(prof&&prof.losses)||0, xp:(prof&&prof.xp)||0,
-    coins:(prof&&prof.coins!=null)?prof.coins:1000, friends:[]};
+  const prev=accts[uname.toLowerCase()]||{};
+  accts[uname.toLowerCase()]={username:uname, addr:(prof&&prof.wallet)||prev.addr||'', pin,
+    wins:Math.max(prev.wins||0,(prof&&prof.wins)||0), losses:Math.max(prev.losses||0,(prof&&prof.losses)||0),
+    xp:Math.max(prev.xp||0,(prof&&prof.xp)||0),
+    coins:(prof&&prof.coins!=null)?prof.coins:(prev.coins!=null?prev.coins:1000), friends:prev.friends||[]};
   saveAccts(accts); DB.set('sh_last', uname); account=accts[uname.toLowerCase()];
   if(prof&&prof.avatar) DB.set('sh_pic_'+uname.toLowerCase(), prof.avatar);
+  await pushProfile();   // if local was higher, raise cloud to match (GREATEST) so both sides converge UP
   startPresence(); startInbox(); enterLobby();
 }
 $('siBtn').onclick=signInOnline;
@@ -4015,10 +4036,13 @@ async function ensureOnline(){
   }
   const uid=r.data && r.data.user && r.data.user.id;
   if(!uid){ if($('socialNote')) $('socialNote').textContent='Could not sign in online (check email-confirm is OFF in Supabase).'; return false; }
-  const av=avatarOf(account.username)||undefined;
-  await sb.from('profiles').upsert({id:uid, username:account.username, wallet:account.addr,
-    wins:account.wins||0, losses:account.losses||0, xp:account.xp||0, avatar:av});
+  // b86: ensure the row EXISTS without overwriting monotonic fields. The old upsert pushed
+  // {xp:account.xp||0,...} every lobby entry, so an empty-localStorage context (new device / cleared
+  // cache / different origin) clobbered real cloud progress to 0 -> level 1. Now we only upsert the
+  // identity (id+username), then raise xp/wins/losses/wallet/avatar via merge_profile (GREATEST).
+  await sb.from('profiles').upsert({id:uid, username:account.username});
   sbUser={id:uid, username:account.username};
+  await pushProfile();  // monotonic raise — a fresh/empty context can NEVER lower cloud values
   startPresence();
   syncCoins();          // pull authoritative $BASED balance (new profiles default to 1000)
   return true;

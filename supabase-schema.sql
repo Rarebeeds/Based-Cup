@@ -139,6 +139,23 @@ language sql stable as $$
   where lower(username) = lower(p_username);
 $$;
 
+-- ====== Monotonic profile sync (b86) — fixes "player level randomly resets to 1" ======
+-- The client now writes profile progress ONLY through this RPC, which raises xp/wins/losses with
+-- GREATEST so a stale/empty (0) context can never lower real progress. Coins are intentionally
+-- excluded (they move only through settle_match). security definer + where id = auth.uid() means a
+-- caller can only ever update their OWN row. Run once in the Supabase SQL editor.
+create or replace function merge_profile(p_xp int, p_wins int, p_losses int, p_wallet text, p_avatar text)
+returns void language sql security definer as $$
+  update profiles set
+    xp     = greatest(coalesce(xp,0),     coalesce(p_xp,0)),
+    wins   = greatest(coalesce(wins,0),   coalesce(p_wins,0)),
+    losses = greatest(coalesce(losses,0), coalesce(p_losses,0)),
+    wallet = coalesce(nullif(p_wallet,''), wallet),
+    avatar = coalesce(nullif(p_avatar,''), avatar)
+  where id = auth.uid();
+$$;
+grant execute on function merge_profile(int,int,int,text,text) to authenticated;
+
 -- NOTE on security: writes should go through the Vercel function using the
 -- SERVICE ROLE key (server-side only). Do NOT expose the service role key to
 -- the browser. If you ever let the client write directly with the anon key,

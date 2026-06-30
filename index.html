@@ -594,7 +594,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b79 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b80 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -2359,7 +2359,7 @@ function loop(ts){
     }
     // round-trip ping for the on-screen latency readout (both roles)
     if(netRole){ pingAcc+=dt; if(pingAcc>=0.34){ pingAcc=0; NET.relay({ping:performance.now()}); }   // ~3Hz so the adaptive buffer reacts fast
-      pingDispAcc+=dt; if(pingDispAcc>=1.0){ pingDispAcc=0; NET.rttShown=NET.rtt; } }   // on-screen ping updates 1Hz (no flicker)
+      pingDispAcc+=dt; if(pingDispAcc>=1.0){ pingDispAcc=0; NET.rttShown=(NET.rttDisp!=null?NET.rttDisp:NET.rtt); } }   // show the HONEST RTT (b80), 1Hz
   }
   // advance the goal juice (visual only, both roles). The slow-mo scales the FX clock too; the match clock stays real-time.
   let fxDt = isSlowmo() ? dt*GOAL_SLOWMO_SCALE : dt;
@@ -3294,8 +3294,16 @@ async function loadTurn(){
   if(TURN_SERVERS.length && (Date.now()-(loadTurn._at||0) < 3600000)) return;   // cache ~1h (creds are short-lived; refetch hourly)
   try{ const r=await fetch(location.origin+'/api/turn',{cache:'no-store'}); if(!r.ok) return;
     const d=await r.json();
-    if(d && d.iceServers){ TURN_SERVERS = Array.isArray(d.iceServers)?d.iceServers:[d.iceServers]; loadTurn._at=Date.now();
-      if(P2P_DEBUG) console.log('[p2p] TURN loaded from /api/turn ('+TURN_SERVERS.length+' server(s))'); }
+    if(d && d.iceServers){
+      const arr = Array.isArray(d.iceServers)?d.iceServers:[d.iceServers];
+      // UDP-ONLY (b80): keep stun + turn-over-udp, drop turn-tcp / turns-tls. Fewer relay candidates means a
+      // DIRECT (srflx) pair isn't drowned out in nomination, and any relay we DO use is low-latency UDP (the
+      // TCP/TLS relay paths were what made the fallback 500ms+). prefer-direct (b79) still declines relay anyway.
+      TURN_SERVERS = arr.map(s=>{ if(!s.urls) return s;
+          const u=(Array.isArray(s.urls)?s.urls:[s.urls]).filter(x=> x.indexOf('stun:')===0 || (x.indexOf('turn:')===0 && /transport=udp/.test(x)));
+          return Object.assign({}, s, {urls:u}); }).filter(s=> s.urls && s.urls.length);
+      loadTurn._at=Date.now();
+      if(P2P_DEBUG) console.log('[p2p] TURN loaded from /api/turn — UDP-only ('+TURN_SERVERS.length+' server(s))'); }
     else if(P2P_DEBUG) console.log('[p2p] /api/turn returned no creds — STUN-only (set TURN_KEY_ID + TURN_KEY_API_TOKEN in Vercel)');
   }catch(e){}
 }
@@ -3366,7 +3374,7 @@ const NET = {
       // KEEP the P2P channel only if the selected ICE pair is DIRECT (host/srflx). A TURN-RELAYED pair just
       // bounces through Cloudflare and was measured worse + flappier than the (Sydney) WS relay — so relay-only
       // peers stay on the WS relay; cone-NAT peers get the real direct ⚡ win. (Prefer-direct policy, b79.)
-      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — DIRECT P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
+      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; NET.rttDisp=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — DIRECT P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
       dc.onopen=()=>{ try{ pc.getStats().then(st=>{
             let selId=null; st.forEach(r=>{ if(r.type==='transport' && r.selectedCandidatePairId) selId=r.selectedCandidatePairId; });
             let pair=selId?st.get(selId):null;
@@ -3400,7 +3408,7 @@ const NET = {
       if(this.remoteSet) pc.addIceCandidate(rtc.c).catch(()=>{}); else this.candQ.push(rtc.c); }
   },
   drainCand(){ for(const c of this.candQ){ try{ this.pc.addIceCandidate(c).catch(()=>{}); }catch(_){} } this.candQ=[]; },
-  p2pDown(){ clearTimeout(this._discT); if(this.dc){ try{this.dc.close();}catch(_){}} this.dc=null;
+  p2pDown(){ clearTimeout(this._discT); if(this.dc){ try{this.dc.close();}catch(_){}} this.dc=null; NET.rttDisp=null;   // recompute the shown ping for the relay path
     if(this.p2p){ this.p2p=false; showToast('Relay mode','#ffd43b'); } },   // game keeps running on the WS relay
   p2pReset(){ clearTimeout(this._discT); this.p2pDown(); if(this.pc){ try{this.pc.close();}catch(_){}} this.pc=null; this.remoteSet=false; this.candQ=[]; this.p2p=false; },
   _discT:null,
@@ -3472,8 +3480,10 @@ function onRelayData(d){
     else if(d.left){ peerLeft=true; greyRematch('Your friend went back to the menu.'); }
     else if(d.ping!=null){ NET.relay({pong:d.ping}); }   // bounce it back so the peer can measure RTT
     else if(d.pong!=null){ const rtt=Math.round(performance.now()-d.pong);
-      // asymmetric EMA: grow the cushion FAST on a spike, relax it slowly — so a ping
-      // jump expands the buffer within ~1s instead of stuttering for several seconds.
+      // DISPLAY (b80): honest, lightly + SYMMETRICALLY smoothed actual RTT — what the pill shows.
+      NET.rttDisp = NET.rttDisp==null ? rtt : Math.round(NET.rttDisp*0.7+rtt*0.3);
+      // BUFFER: asymmetric EMA grows the cushion FAST on a spike, relaxes slowly — drives the jitter buffer
+      // (INTERP/BALL delay), NOT the shown number. (Using it for display over-reported the ping under jitter.)
       NET.rtt = NET.rtt==null ? rtt : (rtt>NET.rtt ? Math.round(NET.rtt*0.4+rtt*0.6) : Math.round(NET.rtt*0.85+rtt*0.15));
       INTERP_DELAY = clamp(34 + NET.rtt*0.30, 44, 140);   // low floor for AU-AU/P2P; EMA still grows it fast on jitter
       BALL_DELAY   = clamp(16 + NET.rtt*0.10, 20, 54); }   // ball near real-time — kicks land almost instantly on low ping

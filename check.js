@@ -1746,6 +1746,7 @@ function enterLobby(){
   $('startScreen').classList.remove('hide');
   $('xBtn').classList.remove('hide');   // X link is available from the main menu onward, not on the intro
   refreshAcctBtn(); renderDaily(); syncRegionUI(); setMenuDocks(true); renderMenuTop3();
+  renderLobbyShowcase();   // b90: paint the equipped-character showcase each time we enter the lobby
   startMusic('lobby');
   if(SOCIAL_ON()) ensureOnline().then(()=>{ startInbox(); });   // sign in for friends/chat/notifs
   if(pendingJoin) setTimeout(autoJoin, 300);   // arrived via an invite link
@@ -2197,7 +2198,19 @@ function setEquipped(c){ if(!STATS[c]||!isOwned(c)) return; equippedChar=c; huma
 async function syncEquippedFromCloud(){ if(!sb||!sbUser) return;
   try{ const {data}=await sb.from('profiles').select('equipped').eq('id',sbUser.id).single();
     if(data && data.equipped && STATS[data.equipped]){ DB.set(equipKey(), data.equipped); loadEquipped(); } }catch(_){} }
-function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=STATS[equippedChar]?STATS[equippedChar].name:'your character'; }
+function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=STATS[equippedChar]?STATS[equippedChar].name:'your character'; renderLobbyShowcase(); }
+// b90 UI REMODEL: render the central lobby showcase — equipped sprite in front of their ore-tier holo card.
+// Reads the equipped value; called on equip change (updateLockerBtn) + on entering the lobby. Null-guarded.
+function renderLobbyShowcase(){
+  const c=(STATS[equippedChar]&&isOwned(equippedChar))?equippedChar:'pepe';
+  const hero=document.getElementById('lobbyHero'); if(hero){ const im=imgFor(c); hero.src=(im&&im.src)||''; }
+  const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
+  const ov=document.getElementById('lobbyOvr'); if(ov) ov.textContent=overallOf(c);
+  const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker's ore-tier styling
+}
+let _inviteMsgT=null;
+function showInviteMsg(){ const m=document.getElementById('inviteMsg'); if(!m) return;
+  m.classList.remove('hide'); clearTimeout(_inviteMsgT); _inviteMsgT=setTimeout(()=>m.classList.add('hide'),1900); }
 
 // per-character RECORD store — BUILD 2 populates this. Local now (cloud-mirrorable later). Returns
 // safe zeros so the card BACK renders cleanly with no data yet.
@@ -2387,6 +2400,12 @@ $('selStartBtn').onclick=()=>{
 // no character/opponent select screen. Defaults to vs-CPU at the current difficulty.
 $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
   gameMode='goals'; ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };
+// b90 UI REMODEL: invite slot (2v2 placeholder). Hover (desktop) reveals INVITE via CSS; tap (mobile) toggles it;
+// clicking INVITE shows a clean styled "coming with 2v2" message — no real party functionality yet.
+(function(){ const slot=$('inviteSlot'), btn=$('inviteBtn'); if(!slot) return;
+  slot.addEventListener('click',e=>{ if(btn && (e.target===btn || btn.contains(e.target))) return; slot.classList.toggle('reveal'); });
+  if(btn) btn.addEventListener('click',e=>{ e.stopPropagation(); showInviteMsg(); });
+})();
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
 let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;

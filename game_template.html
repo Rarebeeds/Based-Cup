@@ -594,7 +594,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b83 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b84 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -2355,7 +2355,7 @@ function loop(ts){
       }
       updateHUD();
       // keep streaming even while frozen so the guest sees ht=1 (freeze) then ht=0 (resume)
-      if(netRole==='host'){ stateSendAcc+=dt; if(stateSendAcc>=0.0166){ stateSendAcc=0; sendState(); } }   // ~60Hz snapshots (fresher opponent/ball)
+      if(netRole==='host'){ stateSendAcc+=dt; if(stateSendAcc>=SNAP_INTERVAL_S){ stateSendAcc-=SNAP_INTERVAL_S; if(stateSendAcc>SNAP_INTERVAL_S) stateSendAcc=0; sendState(); } }   // steady 60Hz (keep the remainder, don't reset -> less send-cadence jitter)
     }
     // round-trip ping for the on-screen latency readout (both roles)
     if(netRole){ pingAcc+=dt; if(pingAcc>=0.34){ pingAcc=0; NET.relay({ping:performance.now()}); }   // ~3Hz so the adaptive buffer reacts fast
@@ -3488,8 +3488,8 @@ function onRelayData(d){
       // BUFFER: asymmetric EMA grows the cushion FAST on a spike, relaxes slowly — drives the jitter buffer
       // (INTERP/BALL delay), NOT the shown number. (Using it for display over-reported the ping under jitter.)
       NET.rtt = NET.rtt==null ? rtt : (rtt>NET.rtt ? Math.round(NET.rtt*0.4+rtt*0.6) : Math.round(NET.rtt*0.85+rtt*0.15));
-      INTERP_DELAY = clamp(34 + NET.rtt*0.30, 44, 140);   // low floor for AU-AU/P2P; EMA still grows it fast on jitter
-      BALL_DELAY   = clamp(16 + NET.rtt*0.10, 20, 54); }   // ball near real-time — kicks land almost instantly on low ping
+      INTERP_DELAY = clamp(INTERP_FLOOR + NET.rtt*0.30, INTERP_FLOOR, INTERP_CEIL);   // b84: floor holds ≥4-5 snapshots of buffer; grows under jitter
+      BALL_DELAY   = clamp(BALL_FLOOR  + NET.rtt*0.10, BALL_FLOOR,  BALL_CEIL); }      // ball responsive but with real cushion
 }
 // remember the last few real people you played online
 function recordOpponent(name){
@@ -3731,8 +3731,20 @@ function sendState(extra){
 // guest buffers snapshots and renders in the past, gliding between them.
 // the buffer adapts to measured ping (tight on Sydney, larger on Singapore) so motion
 // stays smooth without stutter when packets arrive unevenly — see the pong handler.
-let INTERP_DELAY=50;       // opponent/own player smoothing buffer (adaptive 44–140ms)
-let BALL_DELAY=22;         // render the ball nearly real-time so kicks feel responsive (adaptive)
+// ---- Guest interpolation tunables (b84). ROOT CAUSE of the guest choppiness: the old floors
+// (INTERP 44ms / BALL 20ms) were BELOW ~2 snapshots of buffer (host sends 60Hz = 16.6ms/snap), so
+// normal receive jitter constantly underran the buffer -> the guest EXTRAPOLATED ("guessed") then
+// SNAPPED back, choppy even on a good link. Floors raised to hold a real cushion; a little extra
+// latency bought for a lot more smoothness. Still adaptive — grow under measured jitter (rtt). ----
+const INTERP_FLOOR=80, INTERP_CEIL=170;   // opponent/own buffer (ms): floor ≈ 4-5 snapshots of cushion @60Hz
+const BALL_FLOOR=48,  BALL_CEIL=85;       // ball buffer (ms): still responsive, but ≥2-3 snapshots of cushion
+const RENDER_SNAP_PX=34;   // a per-frame render JUMP bigger than this = a discontinuity (underrun/reset) -> EASE it; smaller = track exactly (no added lag)
+const RENDER_EASE=0.35;    // how fast an eased (snapped) render position closes to the true interp target, per frame
+const SNAP_INTERVAL_S=1/60;// host snapshot cadence (steady the send loop instead of resetting the accumulator)
+const EXTRAP_CAP_MS=100;   // on buffer underrun, continue last-known velocity for at most this long, then hold
+let INTERP_DELAY=INTERP_FLOOR, BALL_DELAY=BALL_FLOOR;   // current adaptive values (set in the pong handler)
+// ease only DISCONTINUITIES (snaps); track normal motion exactly so we add no lag in the common case
+function smoothRender(cur,target){ if(cur==null) return target; const d=target-cur; return Math.abs(d)>RENDER_SNAP_PX ? cur+d*RENDER_EASE : target; }
 function pushNetState(s){
   NET.buf.push({t:performance.now(), s});
   if(NET.buf.length>40) NET.buf.shift();   // ~0.8s of history at 50Hz — room for the adaptive buffer
@@ -3745,7 +3757,7 @@ function sampleAt(delay){
   const buf=NET.buf, rt=performance.now()-delay;
   for(let i=0;i<buf.length-1;i++){ if(buf[i].t<=rt && buf[i+1].t>=rt) return {s:buf[i].s, sb:buf[i+1].s, k:(rt-buf[i].t)/((buf[i+1].t-buf[i].t)||1)}; }
   if(buf.length>=2){ const a=buf[buf.length-2], b=buf[buf.length-1];
-    const span=(b.t-a.t)||1; let ahead=rt-b.t; if(ahead<0)ahead=0; if(ahead>120)ahead=120;
+    const span=(b.t-a.t)||1; let ahead=rt-b.t; if(ahead<0)ahead=0; if(ahead>EXTRAP_CAP_MS)ahead=EXTRAP_CAP_MS;   // continue last velocity briefly on underrun
     let f=ahead/span; if(f>1)f=1; return {s:a.s, sb:b.s, k:1+f}; }
   const latest=buf[buf.length-1].s; return {s:latest, sb:latest, k:0};
 }
@@ -3772,11 +3784,11 @@ function applyNetState(){
   const oppHasBall = latest.b && latest.b.own==='p';
   const Bl=sampleAt(oppHasBall ? INTERP_DELAY : BALL_DELAY);
   const ap=players.p, at=players.t;
-  ap.x=nlerp(P.s.p.x,P.sb.p.x,P.k); ap.y=nlerp(P.s.p.y,P.sb.p.y,P.k); ap.aim=alerp(P.s.p.aim,P.sb.p.aim,P.k);
+  ap.x=smoothRender(ap.x, nlerp(P.s.p.x,P.sb.p.x,P.k)); ap.y=smoothRender(ap.y, nlerp(P.s.p.y,P.sb.p.y,P.k)); ap.aim=alerp(P.s.p.aim,P.sb.p.aim,P.k);
   ap.face=P.sb.p.face; ap.char=P.sb.p.char; ap.stamina=P.sb.p.stam; ap.charge=P.sb.p.ch||0; ap.charging=!!P.sb.p.cg;
   at.x=nlerp(P.s.t.x,P.sb.t.x,P.k); at.y=nlerp(P.s.t.y,P.sb.t.y,P.k); at.aim=alerp(P.s.t.aim,P.sb.t.aim,P.k);
   at.face=P.sb.t.face; at.char=P.sb.t.char; at.stamina=P.sb.t.stam; at.charge=P.sb.t.ch||0; at.charging=!!P.sb.t.cg;
-  ball.x=nlerp(Bl.s.b.x,Bl.sb.b.x,Bl.k); ball.y=nlerp(Bl.s.b.y,Bl.sb.b.y,Bl.k);
+  ball.x=smoothRender(ball.x, nlerp(Bl.s.b.x,Bl.sb.b.x,Bl.k)); ball.y=smoothRender(ball.y, nlerp(Bl.s.b.y,Bl.sb.b.y,Bl.k));
   ball.roll=Bl.sb.b.roll; ball.dir=Bl.sb.b.dir; ball.netSide=Bl.sb.b.net||null; ball.owner=Bl.sb.b.own||null;
 }
 function showWinFromNet(who){

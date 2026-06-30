@@ -428,6 +428,12 @@
   .spRow.cur{border-color:#69db7c;background:#102a1a}
   .spRow .spName{font-weight:bold;color:#e9fff0;font-size:14px}
   .spRow .spMeta{font-size:11px;color:#9bf6a8;text-align:right;line-height:1.5;white-space:nowrap}
+  /* a region whose relay isn't live yet (e.g. US) — visible but not selectable */
+  .spRow.soon{opacity:.5;filter:grayscale(.7)}
+  .spRow.soon:hover{border-color:#1f5234}
+  .spRow.soon .spMeta{color:#ffd43b}
+  .seg button.soon{opacity:.5;filter:grayscale(.7)}
+  .seg button.soon.on{background:#0f2417;color:#cfeed8}
   .spRow .spMeta .pgood{color:#69db7c}.spRow .spMeta .pmid{color:#ffd43b}.spRow .spMeta .pbad{color:#ff8787}
   /* scrollable achievements */
   .achGrid{max-height:46vh;overflow-y:auto;padding-right:4px}
@@ -467,7 +473,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b67 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b68 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -485,7 +491,7 @@
   <div id="serverPopup" class="hide">
     <div class="spHead">🌐 Choose server</div>
     <div class="spRow" data-region="syd"><span class="spName">🇦🇺 Sydney</span><span class="spMeta">ping&nbsp;—<br>—&nbsp;playing</span></div>
-    <div class="spRow" data-region="us"><span class="spName">🇺🇸 US</span><span class="spMeta">ping&nbsp;—<br>—&nbsp;playing</span></div>
+    <div class="spRow soon" data-region="us"><span class="spName">🇺🇸 US</span><span class="spMeta">coming&nbsp;soon</span></div>
     <div class="spRow" data-region="sin"><span class="spName">🇸🇬 Singapore</span><span class="spMeta">ping&nbsp;—<br>—&nbsp;playing</span></div>
     <div class="row" style="margin-top:6px"><button class="btn ghost" id="serverPopupClose" style="width:100%;padding:7px">CLOSE</button></div>
   </div>
@@ -767,7 +773,7 @@
       <div class="muted" style="margin-bottom:5px">Server (the host picks — friends who use your invite link or challenge match it automatically):</div>
       <div class="seg" id="regionSeg" style="margin-bottom:8px">
         <button data-region="syd" class="on">🇦🇺 Sydney</button>
-        <button data-region="us">🇺🇸 US</button>
+        <button data-region="us" class="soon">🇺🇸 US · soon</button>
         <button data-region="sin">🇸🇬 Singapore</button>
       </div>
       <input id="netUrl" class="inp" placeholder="wss://your-lobby…" autocomplete="off" spellcheck="false">
@@ -970,6 +976,7 @@ const SOCIAL_ON = ()=> !!sb;
 // Your deployed lobby relays. Host picks one; invite links/challenges carry the
 // chosen URL so the guest matches automatically. (Update these if you redeploy.)
 const LOBBY_SERVERS = { syd:"wss://basedcup-lobby-syd.fly.dev", sin:"wss://basedcup-lobby-sin.fly.dev", us:"wss://basedcup-lobby-us.fly.dev" };
+const REGION_SOON = { us:true };   // US relay not deployed yet -> not selectable (picking it would connect to a dead server). Re-enable by removing this when the US app is live.
 const DEFAULT_LOBBY = LOBBY_SERVERS.syd;
 
 const PEPE_SRC  = "data:image/png;base64,__PEPE__";
@@ -2945,7 +2952,8 @@ function predictGuestSelf(){
 const NET = {
   ws:null, role:null, intentionalClose:false, reconnTries:0,
   connect(then){
-    const url=$('netUrl').value.trim();
+    let url=$('netUrl').value.trim();
+    if(url===LOBBY_SERVERS.us){ url=DEFAULT_LOBBY; $('netUrl').value=url; DB.set('sh_lobby',url); DB.set('sh_region','syd'); }  // US relay not live yet -> fall back (e.g. an old invite link)
     if(!/^wss?:\/\//.test(url)){ $('netErr').textContent='Enter your lobby URL (wss://…).'; return; }
     DB.set('sh_lobby', url);
     $('netErr').textContent=''; $('netStatus').textContent='Connecting…';
@@ -2985,7 +2993,11 @@ const NET = {
   p2pStart(initiator){
     if(typeof RTCPeerConnection==='undefined' || this.pc) return;   // unsupported, or already negotiating
     let pc; try{ pc=new RTCPeerConnection({iceServers:[
-      {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]}); }catch(e){ return; }
+      // multiple STUN providers -> higher direct-P2P success (if one is blocked/slow in a region, another wins).
+      // NOTE: STUN only finds a direct path; symmetric/CGNAT NATs still need a TURN server (not yet configured) and
+      // fall back to relaying game traffic over the WS lobby — see p2pDown(). Add TURN here when a provider is set up.
+      {urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun2.l.google.com:19302']},
+      {urls:'stun:stun.cloudflare.com:3478'}]}); }catch(e){ return; }
     this.pc=pc; this.remoteSet=false; this.candQ=[];
     pc.onicecandidate=e=>{ if(e.candidate) this.signal({c:e.candidate}); };
     pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(s==='failed'||s==='disconnected') this.p2pDown(); };
@@ -3100,7 +3112,9 @@ function onPeerGone(msg){
 }
 // region picker (shared between the main-menu toggle and the lobby screen)
 const REGION_NAME={syd:'🇦🇺 Sydney', sin:'🇸🇬 Singapore', us:'🇺🇸 US'};
-function curRegion(){ return DB.get('sh_region') || (DB.get('sh_lobby')===LOBBY_SERVERS.sin?'sin':'syd'); }
+// one-time sanitize: anyone who had US selected before it was disabled is moved back to a live server
+if(REGION_SOON[DB.get('sh_region')] || DB.get('sh_lobby')===LOBBY_SERVERS.us){ DB.set('sh_region','syd'); DB.set('sh_lobby',LOBBY_SERVERS.syd); }
+function curRegion(){ const r=DB.get('sh_region') || (DB.get('sh_lobby')===LOBBY_SERVERS.sin?'sin':'syd'); return REGION_SOON[r]?'syd':r; }
 function syncRegionUI(){
   const r=curRegion();
   document.querySelectorAll('#regionSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-region')===r));
@@ -3108,6 +3122,7 @@ function syncRegionUI(){
   document.querySelectorAll('#serverPopup .spRow').forEach(row=>row.classList.toggle('cur', row.getAttribute('data-region')===r));
 }
 function setRegion(r){
+  if(REGION_SOON[r]){ showToast('🇺🇸 US server coming soon — pick Sydney or Singapore','#ffd43b'); syncRegionUI(); return; }
   const url=LOBBY_SERVERS[r]||DEFAULT_LOBBY;
   DB.set('sh_lobby',url); DB.set('sh_region',r);
   if($('netUrl')) $('netUrl').value=url;
@@ -3147,6 +3162,7 @@ function pingClass(p){ return p==null?'pbad':p<90?'pgood':p<200?'pmid':'pbad'; }
 async function refreshServerPopup(){
   document.querySelectorAll('#serverPopup .spRow').forEach(row=>{
     const r=row.getAttribute('data-region'), el=row.querySelector('.spMeta'); if(!el) return;
+    if(REGION_SOON[r]){ el.innerHTML='coming&nbsp;soon'; return; }   // relay not live yet -> no ping, keep the label
     const players=playersOnRegion(r);
     el.innerHTML='ping&nbsp;…<br>'+(players==null?'—':players)+'&nbsp;playing';
     pingServer(r).then(p=>{ el.innerHTML='<span class="'+pingClass(p)+'">'+(p==null?'offline':('ping '+p+'ms'))+'</span><br>'+
@@ -3158,7 +3174,9 @@ function closeServerPopup(){ $('serverPopup').classList.add('hide'); }
 $('serverBtn').onclick=()=>{ if($('serverPopup').classList.contains('hide')) openServerPopup(); else closeServerPopup(); };
 $('serverPopupClose').onclick=closeServerPopup;
 document.querySelectorAll('#serverPopup .spRow').forEach(row=>{
-  row.onclick=()=>{ setRegion(row.getAttribute('data-region')); refreshServerPopup(); setTimeout(closeServerPopup,500); }; });
+  row.onclick=()=>{ const rr=row.getAttribute('data-region');
+    if(REGION_SOON[rr]){ setRegion(rr); return; }       // not live yet -> toast, keep popup open to pick another
+    setRegion(rr); refreshServerPopup(); setTimeout(closeServerPopup,500); }; });
 function openOnlineLobby(){ hideAllOverlays(); challengeTarget=null;
   $('onlineScreen').classList.remove('hide');
   applyRegionUI(); $('lobbyBox').classList.add('hide');

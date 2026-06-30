@@ -348,12 +348,35 @@
     color:#fff;text-shadow:0 4px 0 #000,0 0 30px rgba(255,212,59,.8);
     pointer-events:none;opacity:0}
   /* loading screen ("Bringing Goy into the system") */
-  #introReveal{position:absolute;inset:0;z-index:199;background:#000}
-  #introRevealImg{width:100%;height:100%;object-fit:cover;display:block}
-  #loadingScreen{position:absolute;inset:0;z-index:200;background:#000;
+  /* --- cinematic intro reveal: bag yanked off -> doors open -> dive into the dark --- */
+  #introReveal{position:absolute;inset:0;z-index:199;background:#000;overflow:hidden;
+    --dx:50%;--dy:66%;--dw:15%;--dh:34%;                       /* doorway position/size (% of screen) — TUNE to the image */
+    transform-origin:var(--dx) var(--dy);transition:transform .62s cubic-bezier(.6,0,.32,1)}
+  #introReveal.dive{transform:scale(8)}                       /* rush THROUGH the open doors into the dark */
+  #introRevealImg{width:100%;height:100%;object-fit:cover;display:block;
+    filter:brightness(.20) blur(9px);transition:filter .5s ease-out}      /* starts dim+blurred (hood still on) */
+  #introReveal.lit #introRevealImg{filter:brightness(1) blur(0)}          /* …snaps into focus as the bag comes off */
+  #introDoors{position:absolute;left:var(--dx);top:var(--dy);width:var(--dw);height:var(--dh);
+    transform:translate(-50%,-50%);perspective:760px;pointer-events:none}
+  #introVoid{position:absolute;inset:-6%;background:radial-gradient(circle at 50% 42%,#000 55%,#070707)}  /* the dark interior behind the doors */
+  .introLeaf{position:absolute;top:0;height:100%;width:50%;box-sizing:border-box;backface-visibility:hidden;
+    background:linear-gradient(100deg,#4a2e16,#2a1809);border:2px solid #160c04;
+    transition:transform .5s cubic-bezier(.5,0,.35,1)}
+  #introLeafL{left:0;transform-origin:left center;border-right:1px solid #160c04}
+  #introLeafR{right:0;transform-origin:right center}
+  #introDoors.open #introLeafL{transform:rotateY(-112deg)}                 /* the double doors swing open */
+  #introDoors.open #introLeafR{transform:rotateY(112deg)}
+  #introBlack{position:absolute;inset:0;z-index:201;background:#000;opacity:0;pointer-events:none;transition:opacity .5s ease-in}
+  #introBlack.on{opacity:1}
+  #loadingScreen{position:absolute;inset:0;z-index:202;background:#000;
     display:flex;align-items:center;justify-content:center;
     transition:transform .45s cubic-bezier(.6,0,.25,1)}
-  #loadingScreen.rise{transform:translateY(-100%)}            /* curtain rises, uncovering the reveal */
+  #loadingScreen.rise{transform:translateY(-100%)}            /* (legacy curtain, unused) */
+  #loadingScreen.bagoff{animation:bagOff .55s cubic-bezier(.45,0,.2,1) forwards}    /* the hood YANKED up off the lens */
+  @keyframes bagOff{
+    0%{transform:translateY(0) scale(1) rotate(0)}
+    18%{transform:translateY(1.5%) scale(1.05) rotate(-1.4deg)}            /* a violent tug */
+    100%{transform:translateY(-122%) scale(1.6) rotate(9deg);opacity:0} }
   #loadText{color:#e9fff0;font-weight:800;font-size:clamp(16px,3.4vw,26px);letter-spacing:1px;
     text-align:center;text-shadow:0 0 24px rgba(105,219,124,.45);padding:0 18px}
   #loadText .dots{color:#69db7c}
@@ -438,7 +461,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b62 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b63 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -501,8 +524,11 @@
     <div id="mbWager"></div>
   </div>
 
-  <!-- intro reveal image (sits behind the loading screen; uncovered once per session as the black rises) -->
-  <div id="introReveal" class="hide"><img id="introRevealImg" src="__INTRO_REVEAL__" alt=""></div>
+  <!-- intro reveal image + cinematic door rig (uncovered once per session: bag off -> doors open -> dive into the dark) -->
+  <div id="introReveal" class="hide"><img id="introRevealImg" src="__INTRO_REVEAL__" alt="">
+    <div id="introDoors"><div id="introVoid"></div><div id="introLeafL" class="introLeaf"></div><div id="introLeafR" class="introLeaf"></div></div>
+  </div>
+  <div id="introBlack"></div>
   <!-- loading screen ("Bringing Goy into the system") -->
   <div id="loadingScreen" class="hide">
     <div id="loadText">Escorting goyim into system<span class="dots">…</span></div>
@@ -3632,7 +3658,7 @@ function showIntroLoading(fn){
   ov.classList.remove('hide','rise'); ov.classList.add('intro');
   ov.style.transform='';
   if(pe) pe.style.display='none';               // pure terminal look during the intro
-  const TYPE_MS=2300, RISE_MS=450, HOLD_MS=500;
+  const TYPE_MS=2000;   // terminal-typing duration; the cinematic (bag/doors/dive) runs after, on its own timers below
   const msg='> escorting goyim into the system…';   // b59: dropped the generic boot/boilerplate first line; kept this flavour line
   // single idempotent finish: tears everything down and continues. Tapping the screen skips
   // straight here, and a hard safety timer guarantees it ALWAYS runs even if timers are throttled
@@ -3641,25 +3667,37 @@ function showIntroLoading(fn){
   const finish=()=>{ if(done) return; done=true;
     clearTimeout(_loadTimer); clearTimeout(_introSafety);
     ov.removeEventListener('pointerdown',finish);
-    ov.classList.add('hide'); ov.classList.remove('intro','rise'); ov.style.transform='';
-    if(rev) rev.classList.add('hide'); if(pe) pe.style.display='';
+    ov.classList.add('hide'); ov.classList.remove('intro','rise','bagoff'); ov.style.transform='';
+    if(rev){ rev.classList.add('hide'); rev.classList.remove('lit','dive'); }
+    const dr=$('introDoors'); if(dr) dr.classList.remove('open');
+    const bl=$('introBlack'); if(bl) bl.classList.remove('on');     // clean return — never leave it stuck zoomed/dark
+    if(pe) pe.style.display='';
     lt.classList.remove('typing');
     fn&&fn();
   };
   ov.addEventListener('pointerdown',finish);                 // tap anywhere to skip
-  const _introSafety=setTimeout(finish, TYPE_MS+RISE_MS+HOLD_MS+2500);   // worst-case backstop
+  const _introSafety=setTimeout(finish, TYPE_MS+3600);   // worst-case backstop (covers bag-off + doors + dive)
   lt.classList.add('typing'); lt.textContent='';
   const per=Math.max(18, TYPE_MS/msg.length); let i=0;
   clearTimeout(_loadTimer);
   (function tick(){
     if(done) return;
     if(i<=msg.length){ lt.textContent=msg.slice(0,i); i++; _loadTimer=setTimeout(tick, per); return; }
-    lt.classList.remove('typing');                       // typing done (~1s before the end)
-    _loadTimer=setTimeout(()=>{
+    lt.classList.remove('typing');                       // typing done
+    _loadTimer=setTimeout(()=>{                          // 1) the hood is YANKED off the lens; the building snaps into focus
       if(done) return;
-      ov.classList.add('rise');                          // black curtain rises, uncovering the image
-      _loadTimer=setTimeout(finish, RISE_MS+HOLD_MS);    // after the rise, hold the image then continue
-    }, 120);
+      ov.classList.add('bagoff'); if(rev) rev.classList.add('lit');
+      _loadTimer=setTimeout(()=>{                        // 2) you're staring at the building -> the doors swing OPEN
+        if(done) return;
+        const dr=$('introDoors'); if(dr) dr.classList.add('open');
+        _loadTimer=setTimeout(()=>{                      // 3) you're hurled THROUGH the doors into the dark interior
+          if(done) return;
+          if(rev) rev.classList.add('dive');
+          const bl=$('introBlack'); if(bl) bl.classList.add('on');
+          _loadTimer=setTimeout(finish, 600);            // 4) darkness fills the screen -> drop into the menu
+        }, 560);
+      }, 660);
+    }, 150);
   })();
 }
 function showMatchBanner(){

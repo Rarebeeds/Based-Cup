@@ -2740,7 +2740,7 @@ function showIntroLoading(fn){
   ov.classList.remove('hide','rise'); ov.classList.add('intro');
   ov.style.transform='';
   if(pe) pe.style.display='none';               // pure terminal look during the intro
-  const TYPE_MS=2300, RISE_MS=450, HOLD_MS=500;
+  const TYPE_MS=2000;   // terminal-typing duration; the cinematic (bag/doors/dive) runs after, on its own timers below
   const msg='> escorting goyim into the system…';   // b59: dropped the generic boot/boilerplate first line; kept this flavour line
   // single idempotent finish: tears everything down and continues. Tapping the screen skips
   // straight here, and a hard safety timer guarantees it ALWAYS runs even if timers are throttled
@@ -2749,25 +2749,37 @@ function showIntroLoading(fn){
   const finish=()=>{ if(done) return; done=true;
     clearTimeout(_loadTimer); clearTimeout(_introSafety);
     ov.removeEventListener('pointerdown',finish);
-    ov.classList.add('hide'); ov.classList.remove('intro','rise'); ov.style.transform='';
-    if(rev) rev.classList.add('hide'); if(pe) pe.style.display='';
+    ov.classList.add('hide'); ov.classList.remove('intro','rise','bagoff'); ov.style.transform='';
+    if(rev){ rev.classList.add('hide'); rev.classList.remove('lit','dive'); }
+    const dr=$('introDoors'); if(dr) dr.classList.remove('open');
+    const bl=$('introBlack'); if(bl) bl.classList.remove('on');     // clean return — never leave it stuck zoomed/dark
+    if(pe) pe.style.display='';
     lt.classList.remove('typing');
     fn&&fn();
   };
   ov.addEventListener('pointerdown',finish);                 // tap anywhere to skip
-  const _introSafety=setTimeout(finish, TYPE_MS+RISE_MS+HOLD_MS+2500);   // worst-case backstop
+  const _introSafety=setTimeout(finish, TYPE_MS+3600);   // worst-case backstop (covers bag-off + doors + dive)
   lt.classList.add('typing'); lt.textContent='';
   const per=Math.max(18, TYPE_MS/msg.length); let i=0;
   clearTimeout(_loadTimer);
   (function tick(){
     if(done) return;
     if(i<=msg.length){ lt.textContent=msg.slice(0,i); i++; _loadTimer=setTimeout(tick, per); return; }
-    lt.classList.remove('typing');                       // typing done (~1s before the end)
-    _loadTimer=setTimeout(()=>{
+    lt.classList.remove('typing');                       // typing done
+    _loadTimer=setTimeout(()=>{                          // 1) the hood is YANKED off the lens; the building snaps into focus
       if(done) return;
-      ov.classList.add('rise');                          // black curtain rises, uncovering the image
-      _loadTimer=setTimeout(finish, RISE_MS+HOLD_MS);    // after the rise, hold the image then continue
-    }, 120);
+      ov.classList.add('bagoff'); if(rev) rev.classList.add('lit');
+      _loadTimer=setTimeout(()=>{                        // 2) you're staring at the building -> the doors swing OPEN
+        if(done) return;
+        const dr=$('introDoors'); if(dr) dr.classList.add('open');
+        _loadTimer=setTimeout(()=>{                      // 3) you're hurled THROUGH the doors into the dark interior
+          if(done) return;
+          if(rev) rev.classList.add('dive');
+          const bl=$('introBlack'); if(bl) bl.classList.add('on');
+          _loadTimer=setTimeout(finish, 600);            // 4) darkness fills the screen -> drop into the menu
+        }, 560);
+      }, 660);
+    }, 150);
   })();
 }
 function showMatchBanner(){

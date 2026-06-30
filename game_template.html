@@ -594,7 +594,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b78 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b79 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -3357,9 +3357,26 @@ const NET = {
         this.signal({c:e.candidate});
       } else if(P2P_DEBUG){ console.log('[p2p] ICE gathering complete — local candidates '+JSON.stringify(pc._cand)); } };
     pc.oniceconnectionstatechange=()=>{ if(P2P_DEBUG) console.log('[p2p] iceConnectionState: '+pc.iceConnectionState); };
-    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(P2P_DEBUG) console.log('[p2p] connectionState: '+s); if(s==='failed'||s==='disconnected') this.p2pDown(); };
+    pc.onconnectionstatechange=()=>{ const s=pc.connectionState; if(P2P_DEBUG) console.log('[p2p] connectionState: '+s);
+      if(s==='failed'){ clearTimeout(this._discT); this.p2pDown(); }
+      else if(s==='disconnected'){ clearTimeout(this._discT);          // 'disconnected' is TRANSIENT/recoverable — ride it out, don't thrash
+        this._discT=setTimeout(()=>{ if(this.pc===pc && pc.connectionState!=='connected') this.p2pDown(); }, 6000); }
+      else if(s==='connected'){ clearTimeout(this._discT); } };
     const wire=dc=>{ this.dc=dc;
-      dc.onopen=()=>{ this.p2p=true; NET.rtt=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — direct P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
+      // KEEP the P2P channel only if the selected ICE pair is DIRECT (host/srflx). A TURN-RELAYED pair just
+      // bounces through Cloudflare and was measured worse + flappier than the (Sydney) WS relay — so relay-only
+      // peers stay on the WS relay; cone-NAT peers get the real direct ⚡ win. (Prefer-direct policy, b79.)
+      const keepP2P=()=>{ this.p2p=true; NET.rtt=null; if(P2P_DEBUG) console.log('[p2p] ⚡ DataChannel OPEN — DIRECT P2P established'); showToast('⚡ Direct P2P connected — lower ping','#69db7c'); };
+      dc.onopen=()=>{ try{ pc.getStats().then(st=>{
+            let selId=null; st.forEach(r=>{ if(r.type==='transport' && r.selectedCandidatePairId) selId=r.selectedCandidatePairId; });
+            let pair=selId?st.get(selId):null;
+            if(!pair) st.forEach(r=>{ if(r.type==='candidate-pair' && r.nominated && r.state==='succeeded') pair=r; });
+            const loc=pair&&st.get(pair.localCandidateId), rem=pair&&st.get(pair.remoteCandidateId);
+            const relayed=(loc&&loc.candidateType==='relay')||(rem&&rem.candidateType==='relay');
+            if(P2P_DEBUG) console.log('[p2p] selected pair '+((loc&&loc.candidateType)||'?')+'/'+((rem&&rem.candidateType)||'?'));
+            if(relayed){ if(P2P_DEBUG) console.log('[p2p] P2P is TURN-RELAYED (not direct) → staying on the closer WS relay'); this.p2pDown(); }
+            else keepP2P();
+          }).catch(keepP2P); }catch(_){ keepP2P(); } };
       dc.onclose=()=>this.p2pDown();
       dc.onmessage=ev=>{ let d; try{d=JSON.parse(ev.data);}catch(_){return;} onRelayData(d); };
     };
@@ -3383,9 +3400,10 @@ const NET = {
       if(this.remoteSet) pc.addIceCandidate(rtc.c).catch(()=>{}); else this.candQ.push(rtc.c); }
   },
   drainCand(){ for(const c of this.candQ){ try{ this.pc.addIceCandidate(c).catch(()=>{}); }catch(_){} } this.candQ=[]; },
-  p2pDown(){ if(this.dc){ try{this.dc.close();}catch(_){}} this.dc=null;
+  p2pDown(){ clearTimeout(this._discT); if(this.dc){ try{this.dc.close();}catch(_){}} this.dc=null;
     if(this.p2p){ this.p2p=false; showToast('Relay mode','#ffd43b'); } },   // game keeps running on the WS relay
-  p2pReset(){ this.p2pDown(); if(this.pc){ try{this.pc.close();}catch(_){}} this.pc=null; this.remoteSet=false; this.candQ=[]; this.p2p=false; },
+  p2pReset(){ clearTimeout(this._discT); this.p2pDown(); if(this.pc){ try{this.pc.close();}catch(_){}} this.pc=null; this.remoteSet=false; this.candQ=[]; this.p2p=false; },
+  _discT:null,
   state:null, buf:[],
   guestInput:{ax:0,ay:0,aim:Math.PI,sprint:false,kick:false}
 };

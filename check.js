@@ -779,6 +779,7 @@ function issueFoul(lunger, fouled){
   if(goalLock>0 || lunger.out) return;
   lunger.cards=(lunger.cards||0)+1;
   const red = lunger.cards>=2;
+  recordCard(lunger.who, red);    // b88: per-character card tracking (every foul = 🟨; 2nd = 🟨+🟥) — before any early return
   foulSeq++; foulCardType=red?2:1; foulCardSide=lunger.who;               // streamed so the guest flashes the same card
   showCard(red?'red':'yellow', STATS[lunger.char].name);
   showToast((red?'🟥 RED — ':'🟨 YELLOW — ')+STATS[lunger.char].name+(red?' sent off!':' (foul)'), red?'#ff6b6b':'#ffd43b');
@@ -1831,6 +1832,7 @@ function openProfile(){
   $('profWins').textContent=a.wins||0; $('profLoss').textContent=a.losses||0;
   const tot=(a.wins||0)+(a.losses||0);
   $('profRate').textContent= tot? Math.round((a.wins||0)/tot*100)+'%' : '—';
+  { const ct=cardTotals(); if($('profYellow')) $('profYellow').textContent=ct.yellow; if($('profRed')) $('profRed').textContent=ct.red; }   // b88: total cards across ALL characters
   $('profCoinsTop').innerHTML= coinIcon()+(account.guest ? ' —' : (' '+(a.coins||0)));
   showProfTab('stats');
   $('profComments').innerHTML='<div class="empty">—</div>';
@@ -2178,23 +2180,39 @@ function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=S
 function charRecordAll(){ const v=DB.get(crecKey()); return (v && typeof v==='object') ? v : {}; }   // DB.get already parses — no double-parse
 function getCharRecord(c){ const r=charRecordAll()[c]||{};
   return { wins:r.wins||0, losses:r.losses||0, gf:r.gf||0, ga:r.ga||0, og:r.og||0,
-           dribbleOk:r.dribbleOk||0, dribbleTry:r.dribbleTry||0, tackleOk:r.tackleOk||0, tackleTry:r.tackleTry||0 }; }
+           dribbleOk:r.dribbleOk||0, dribbleTry:r.dribbleTry||0, tackleOk:r.tackleOk||0, tackleTry:r.tackleTry||0,
+           yellow:r.yellow||0, red:r.red||0 }; }   // b88: cards
+// b88: TOTAL yellow + red cards summed across ALL characters (for the profile screen)
+function cardTotals(){ const all=charRecordAll(); let y=0,r=0; for(const k in all){ y+=(all[k].yellow||0); r+=(all[k].red||0); } return {yellow:y, red:r}; }
 function recPct(ok,tot){ return tot>0 ? Math.round(ok/tot*100)+'%' : '—'; }
 
 // ===== BUILD 2: per-character match stat TRACKING (observe existing events; record; no gameplay change) =====
 function crecKey(){ return 'sh_crec_'+(((account&&account.username)||'guest')+'').toLowerCase(); }
-function statBlank(){ return {wins:0,losses:0,gf:0,ga:0,og:0,dribbleOk:0,dribbleTry:0,tackleOk:0,tackleTry:0}; }
+function statBlank(){ return {wins:0,losses:0,gf:0,ga:0,og:0,dribbleOk:0,dribbleTry:0,tackleOk:0,tackleTry:0,yellow:0,red:0}; }   // b88: + yellow/red cards
 // merge a finished-match delta for ONE character into the store (local + guarded Supabase mirror).
 function commitCharStats(char, rec){
   if(!char || !rec) return;
   const all=charRecordAll(), cur=Object.assign(statBlank(), all[char]||{});
   Object.keys(statBlank()).forEach(k=>{ cur[k]+=(rec[k]||0); });
   all[char]=cur; DB.set(crecKey(), all);
-  if(sb && sbUser){ try{ sb.from('profiles').update({char_stats:all}).eq('id',sbUser.id); }catch(_){} }   // needs the char_stats column (guarded — never breaks if absent)
+  // b88: MONOTONIC cloud mirror (like b86 merge_profile). The merge_char_stats RPC takes per-field GREATEST,
+  // so a stale/empty context can NEVER wipe accumulated stats (these are cumulative counters that only rise).
+  // Guarded: if the RPC isn't created yet, local is preserved and cloud just lags — never destructive.
+  if(sb && sbUser){ try{ sb.rpc('merge_char_stats', {p_stats: all}); }catch(_){} }
+}
+// per-char per-field MAX merge (cumulative counters only go up) — used so neither local nor cloud wipes the other.
+function mergeCharStats(a, b){
+  const out={}; const chars=new Set([...Object.keys(a||{}), ...Object.keys(b||{})]);
+  chars.forEach(c=>{ const x=(a&&a[c])||{}, y=(b&&b[c])||{}, m={};
+    const keys=new Set([...Object.keys(x), ...Object.keys(y), ...Object.keys(statBlank())]);
+    keys.forEach(k=>{ m[k]=Math.max((+x[k]||0), (+y[k]||0)); }); out[c]=m; });
+  return out;
 }
 async function syncCharStatsFromCloud(){ if(!sb||!sbUser) return;
   try{ const {data}=await sb.from('profiles').select('char_stats').eq('id',sbUser.id).single();
-    if(data && data.char_stats) DB.set(crecKey(), data.char_stats); }catch(_){} }
+    if(data && data.char_stats){ const merged=mergeCharStats(charRecordAll(), data.char_stats);   // b88: MERGE (max), don't overwrite — local progress can't be wiped by a stale cloud row
+      DB.set(crecKey(), merged);
+      if(sb && sbUser){ try{ sb.rpc('merge_char_stats', {p_stats: merged}); }catch(_){} } } }catch(_){} }
 // per-MATCH accumulator. AUTHORITATIVE side only (host + offline) — the guest never runs the sim,
 // so it can't double-count; it receives its OWN deltas from the host at match end.
 let matchStat=null, matchStatDone=false, statTracking=false;
@@ -2213,6 +2231,13 @@ function recordGoalStat(who){                     // scoreboard-consistent gf/ga
   const opp=who==='p'?'t':'p';
   matchStat[who].gf++; matchStat[opp].ga++;
   if(ball.shooter===opp) matchStat[opp].og++;     // the conceding side shot it into its OWN net
+}
+// b88: card tracking — count EACH card individually. Every foul issues a YELLOW; a 2nd yellow (red=true)
+// ALSO records a RED (cards are NOT consumed into the red), so a two-yellow sending-off = 2🟨 + 1🟥.
+function recordCard(side, isRed){
+  if(!matchStat || !statTracking) return;
+  matchStat[side].yellow++;
+  if(isRed) matchStat[side].red++;
 }
 // commit at match end (host + offline). Host also relays the GUEST its own deltas; the guest applies
 // only what it's sent (it never accumulated) -> each player's stats land on their own profile, once.

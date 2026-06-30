@@ -156,6 +156,31 @@ returns void language sql security definer as $$
 $$;
 grant execute on function merge_profile(int,int,int,text,text) to authenticated;
 
+-- ====== Monotonic per-character stats sync (b88) — Locker BUILD 2 card-back + profile card totals ======
+-- Deep-merges the caller's char_stats jsonb with per-field GREATEST (every stat is a cumulative counter
+-- that only rises), so a stale/empty context can never wipe accumulated per-character stats. Needs the
+-- char_stats jsonb column (added above). security definer + id = auth.uid() = caller's own row only.
+create or replace function merge_char_stats(p_stats jsonb)
+returns void language plpgsql security definer as $$
+declare
+  merged jsonb;
+  ch text; chval jsonb;
+  fld text; fldval text;
+  curch jsonb;
+begin
+  select coalesce(char_stats, '{}'::jsonb) into merged from profiles where id = auth.uid();
+  if merged is null then merged := '{}'::jsonb; end if;
+  for ch, chval in select key, value from jsonb_each(coalesce(p_stats, '{}'::jsonb)) loop
+    curch := coalesce(merged -> ch, '{}'::jsonb);
+    for fld, fldval in select key, value from jsonb_each_text(chval) loop
+      curch := jsonb_set(curch, array[fld], to_jsonb(greatest(coalesce((curch ->> fld)::numeric, 0), coalesce(fldval::numeric, 0))), true);
+    end loop;
+    merged := jsonb_set(merged, array[ch], curch, true);
+  end loop;
+  update profiles set char_stats = merged where id = auth.uid();
+end $$;
+grant execute on function merge_char_stats(jsonb) to authenticated;
+
 -- NOTE on security: writes should go through the Vercel function using the
 -- SERVICE ROLE key (server-side only). Do NOT expose the service role key to
 -- the browser. If you ever let the client write directly with the anon key,

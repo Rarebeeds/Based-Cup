@@ -469,7 +469,9 @@
   #lockerScreen .loCard{width:440px;max-width:96%;display:flex;flex-direction:column;align-items:center;gap:12px;padding:6px 0}
   #lockerScreen .loTop{display:flex;align-items:center;width:100%;padding:0 4px}
   #lockerScreen .loTitle{flex:1;text-align:center;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;letter-spacing:5px;font-size:25px;color:var(--fc-ink)}
-  #lockerScreen .loBackBtn{background:var(--fc-card);border:1px solid var(--fc-line);color:var(--fc-ink);border-radius:12px;padding:7px 13px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(20,44,74,.10)}
+  /* secondary buttons (exit-back + carousel nav) — same FIFA-clean family as the EQUIP CTA */
+  #lockerScreen .loBackBtn{background:var(--fc-card);border:1px solid var(--fc-line);color:var(--fc-ink);border-radius:12px;padding:7px 14px;font-weight:700;letter-spacing:.5px;cursor:pointer;box-shadow:0 4px 12px rgba(20,44,74,.10);transition:border-color .15s,box-shadow .15s}
+  #lockerScreen .loBackBtn:hover{border-color:var(--fc-ink);box-shadow:0 6px 16px rgba(20,44,74,.14)}
   #lockerScreen .loBackBtn:active{transform:scale(.96)}
   #lockerScreen .loSpacer{width:62px}
   #lockerScreen .loStage{position:relative;width:100%;height:360px;display:flex;align-items:center;justify-content:center;touch-action:pan-y}
@@ -519,14 +521,17 @@
   #lockerScreen .loBackNote{font-size:10px;color:var(--fc-ink2);text-align:center;padding:6px 12px 12px}
   /* arrows, dots, equip */
   #lockerScreen .loArrow{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:42px;height:42px;border-radius:50%;
-    background:var(--fc-card);border:1px solid var(--fc-line);color:var(--fc-ink);font-size:24px;font-weight:700;cursor:pointer;box-shadow:0 6px 16px rgba(20,44,74,.16)}
+    background:var(--fc-card);border:1px solid var(--fc-line);color:var(--fc-ink);font-size:24px;font-weight:700;cursor:pointer;box-shadow:0 6px 16px rgba(20,44,74,.16);transition:border-color .15s}
+  #lockerScreen .loArrow:hover{border-color:var(--fc-ink)}
   #lockerScreen .loArrow:active{transform:translateY(-50%) scale(.93)}
   #lockerScreen .loPrev{left:2px}#lockerScreen .loNext{right:2px}
   #lockerScreen .loDots{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;max-width:300px}
   #lockerScreen .loDot{width:7px;height:7px;border-radius:50%;background:rgba(16,36,58,.18);cursor:pointer;transition:all .2s}
   #lockerScreen .loDot.on{background:var(--fc-accent);transform:scale(1.25)}
-  #lockerScreen .loEquip{background:linear-gradient(180deg,var(--fc-accent2),var(--fc-accent));color:#fff;border:none;border-radius:14px;
-    padding:13px 0;width:300px;max-width:86%;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:18px;letter-spacing:2px;cursor:pointer;box-shadow:0 10px 24px rgba(16,163,90,.34)}
+  /* primary CTA — FIFA-clean navy ink (off-green; green is reserved for the EQUIPPED state) */
+  #lockerScreen .loEquip{background:linear-gradient(180deg,#27517a,var(--fc-ink));color:#fff;border:none;border-radius:14px;
+    padding:13px 0;width:300px;max-width:86%;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:18px;letter-spacing:3px;cursor:pointer;box-shadow:0 10px 24px rgba(16,36,58,.26);transition:box-shadow .15s,transform .05s}
+  #lockerScreen .loEquip:hover{box-shadow:0 12px 28px rgba(16,36,58,.34)}
   #lockerScreen .loEquip:active{transform:translateY(1px)}
   #lockerScreen .loEquip.isEquipped{background:var(--fc-card);color:var(--fc-accent);border:2px solid var(--fc-accent);box-shadow:none;cursor:default}
   #lockerScreen .loHint{font-size:11px;color:var(--fc-ink2);text-align:center}
@@ -548,7 +553,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b70 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b71 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -3047,7 +3052,7 @@ function positionLocker(){ const slots=$('loTrack').children;
   const dots=$('loDots'); if(dots) for(let i=0;i<dots.children.length;i++) dots.children[i].classList.toggle('on', i===loIdx);
   const eq=$('loEquipBtn'); if(eq){ const cur=ROSTER[loIdx];
     if(cur===equippedChar){ eq.textContent='✓ EQUIPPED'; eq.classList.add('isEquipped'); }
-    else { eq.textContent='EQUIP '+STATS[cur].name; eq.classList.remove('isEquipped'); } } }
+    else { eq.textContent='EQUIP'; eq.classList.remove('isEquipped'); } } }
 function gotoLocker(i){ loIdx=Math.max(0,Math.min(ROSTER.length-1,i));
   const slots=$('loTrack').children; for(let k=0;k<slots.length;k++) slots[k].classList.remove('flip'); positionLocker(); }
 function flipActiveCard(){ const s=$('loTrack').children[loIdx]; if(s) s.classList.toggle('flip'); }

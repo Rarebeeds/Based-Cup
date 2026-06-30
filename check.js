@@ -2016,7 +2016,7 @@ function positionLocker(){ const slots=$('loTrack').children;
   const dots=$('loDots'); if(dots) for(let i=0;i<dots.children.length;i++) dots.children[i].classList.toggle('on', i===loIdx);
   const eq=$('loEquipBtn'); if(eq){ const cur=ROSTER[loIdx];
     if(cur===equippedChar){ eq.textContent='✓ EQUIPPED'; eq.classList.add('isEquipped'); }
-    else { eq.textContent='EQUIP '+STATS[cur].name; eq.classList.remove('isEquipped'); } } }
+    else { eq.textContent='EQUIP'; eq.classList.remove('isEquipped'); } } }
 function gotoLocker(i){ loIdx=Math.max(0,Math.min(ROSTER.length-1,i));
   const slots=$('loTrack').children; for(let k=0;k<slots.length;k++) slots[k].classList.remove('flip'); positionLocker(); }
 function flipActiveCard(){ const s=$('loTrack').children[loIdx]; if(s) s.classList.toggle('flip'); }

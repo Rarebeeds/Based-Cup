@@ -2249,17 +2249,17 @@ const LOBBY_EASE=0.10;          // head pose ease/frame — LOWER = smoother, sl
 const LOBBY_ROAM_EASE=0.045;    // how briskly he runs to a new roam spot (lower = more leisurely)
 const LOBBY_BALL_GRAV=2.7;      // ball gravity (normalized units/s^2) — HIGHER = deeper up/down arc
 const LOBBY_BALL_BOUNCE=1.30;   // upward speed off a keepup header — HIGHER = higher juggle
-// LOBBY-ONLY face crop: a FEATHERED ELLIPSE head-mask (× the head radius R) — keeps skin/face/hair/facial-hair
-// + small accessories (Elon's wires), clips the shoulders/shirt, and its soft rim means no hard/choppy cut.
-// Robust across the 14 face-width-normalised sprites (suit chars flare wide at the jaw). Per-char overrides
-// below where a head needs it. Does NOT touch the real in-match sprite files or the grab radius / hitbox.
-const LOBBY_HEAD_DEF={ rx:1.55, ry:1.70, cy:-0.18 };
-const LOBBY_HEAD={
-  // taller/wider or lower-set heads get bespoke ellipses so none clip hair or leave shoulders
-  boomer:{rx:1.55,ry:1.66,cy:-0.20}, elon:{rx:1.5,ry:1.58,cy:-0.24}, obampe:{rx:1.5,ry:1.58,cy:-0.24},
-  pdidpe:{rx:1.5,ry:1.56,cy:-0.25}, grandpa:{rx:1.55,ry:1.62,cy:-0.22}, oldwoj:{rx:1.6,ry:1.66,cy:-0.20},
-  trumpe:{rx:1.6,ry:1.7,cy:-0.18}, pepe:{rx:1.66,ry:1.72,cy:-0.16}
-};
+// b96 LOBBY-ONLY face crop = a GROUND-LINE (pitch horizon) approach, NOT a mask. The head is drawn so the
+// neck/jaw sits ON the pitch line and the shoulders/shirt fall BELOW it (clipped away) — he rises out of the
+// pitch, head-only, for all 14. One cut height (in head-radii below the face centre) works for everyone; the
+// line FOLLOWS his vertical bob so a hop/celebrate never re-exposes a shoulder. A soft feather kills the hard
+// edge. Real in-match sprites + the grab radius / hitbox are UNTOUCHED (this is a display clip on the lobby
+// canvas only). The old feathered-ellipse mask is removed (it clipped too low to do anything visible).
+const LOBBY_GROUND_CUT=0.50;    // pitch line = this many head-radii below the face centre. 0.50 clears the shoulder
+                                // flare for ~12/14 (round meme/jak heads sit at a clean jaw line); the widest suit
+                                // sprites (pdidpe, elon) show a small feathered collar hint — a horizontal line
+                                // can't fully separate those since their shoulders are drawn hugging the jaw.
+const LOBBY_JUGGLE_LOW=0.02;    // header contact height above the face centre (SMALLER = ball dips LOWER = deeper arc)
 let _laReq=0, _laLast=0, _la=null;
 function lobbyAnimSetChar(c){ if(_la){ _la.char=c; _la.img=imgFor(c); } }
 function lobbyAnimResize(){ const cv=document.getElementById('lobbyCharCv'); if(!cv||!cv.getBoundingClientRect) return;
@@ -2270,7 +2270,7 @@ function lobbyPickMove(){ let m; do{ m=LA_MOVES[Math.floor(Math.random()*LA_MOVE
   _la.move=m; _la.t=0; _la.dur=({jog:2.6,dribble:3.4,keepups:4.6,celebrate:2.4})[m]||2.8; lobbyOnMoveStart(); }
 function lobbyOnMoveStart(){   // b94: pick a roam target + (re)seat the ball for the new move
   const M=_la.move;
-  _la.roamX=(M==='jog'||M==='dribble') ? (0.16+Math.random()*0.68) : _la.hx;   // run to a new spot, or juggle/celebrate in place
+  _la.roamX=(M==='jog'||M==='dribble') ? (-0.05+Math.random()*1.10) : _la.hx;   // b96: roam edge-to-edge (runs partly off-screen) — no invisible box wall
   if(M==='keepups'){ _la.bx=_la.hx; _la.by=_la.hy-0.30; _la.bvy=0; _la.bshow=true; }
   else if(M==='dribble'){ _la.bx=_la.hx+_la.face*0.05; _la.by=0.90; _la.bvy=-0.55; _la.bshow=true; }
   else { _la.bshow=false; }
@@ -2310,7 +2310,7 @@ function lobbyAnimStep(dt){
   } else if(M==='keepups'){                              // juggle with a proper gravity arc, finish on a BACKFLIP
     if(tt <= _la.dur-1.25){
       _la.bvy+=LOBBY_BALL_GRAV*dt; _la.by+=_la.bvy*dt; _la.bx += (_la.hx-_la.bx)*0.05;
-      const headTop=_la.hy-0.14;
+      const headTop=_la.hy-LOBBY_JUGGLE_LOW;   // b96: ball dips lower (nearer the forehead) before the header = deeper down-arc
       if(_la.by>=headTop && _la.bvy>0){ _la.by=headTop; _la.bvy=-LOBBY_BALL_BOUNCE; _la.hHit=0.09; }   // header bounce
       throt=Math.sin(tt*3)*0.04; thy=headY; tbshow=true;
     } else {
@@ -2330,18 +2330,19 @@ function lobbyAnimStep(dt){
   const vx=_la.hx-prevX;                                  // face the way he's running (dribble/jog); forward otherwise
   if((M==='dribble'||M==='jog') && Math.abs(vx)>0.0006) _la.face = vx>0?1:-1; else if(M!=='dribble'&&M!=='jog') _la.face=1;
 }
-function laDrawHead(c2,img,x,y,rot,face,R,cfg){
+function laDrawHead(c2,img,x,y,rot,face,R,cutY){
   if(!(img&&img.complete&&img.naturalWidth)) return;
   const iw=img.naturalWidth, ih=img.naturalHeight, s=(R*FACE_FIT)/(iw*FACE_RF);
-  const rx=(cfg.rx||1.55)*R, ry=(cfg.ry||1.7)*R, cy=(cfg.cy||-0.18)*R;   // b94 LOBBY-ONLY feathered ELLIPSE mask around the face
-  c2.save(); c2.translate(x,y); c2.rotate(rot);
-  c2.save(); c2.beginPath(); c2.ellipse(0,cy,rx,ry,0,0,7); c2.clip();    // keep head (face+hair+accessories), clip the shoulders/shirt
-  c2.save(); if(face<0)c2.scale(-1,1); c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s); c2.restore();
-  // feather the rim so the crop fades softly (no hard/choppy cut) — radial gradient scaled to the ellipse
-  c2.translate(0,cy); c2.scale(rx,ry);
-  const g=c2.createRadialGradient(0,0,0.80,0,0,1.0); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,1)');
-  c2.globalCompositeOperation='destination-out'; c2.fillStyle=g; c2.beginPath(); c2.arc(0,0,1,0,7); c2.fill();
-  c2.restore(); c2.restore();
+  const W2=c2.canvas.width, fH=Math.max(5,R*0.20);
+  c2.save();
+  c2.beginPath(); c2.rect(0,0,W2,cutY); c2.clip();                       // b96 GROUND-LINE crop: keep only what's ABOVE the pitch line (the head); shoulders/shirt fall below it
+  c2.translate(x,y); c2.rotate(rot); if(face<0)c2.scale(-1,1);
+  c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s);
+  c2.restore();
+  // feather the pitch line so the cut fades softly into the ground (no hard edge)
+  const g=c2.createLinearGradient(0,cutY-fH,0,cutY);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,1)');
+  c2.save(); c2.globalCompositeOperation='destination-out'; c2.fillStyle=g; c2.fillRect(0,cutY-fH,W2,fH); c2.restore();
 }
 function laDrawBall(c2,x,y,r){
   c2.save(); c2.beginPath(); c2.arc(x,y,r,0,7); c2.fillStyle='#fff'; c2.fill();
@@ -2351,12 +2352,13 @@ function laDrawBall(c2,x,y,r){
 function lobbyAnimDraw(cv){
   const c2=cv.getContext&&cv.getContext('2d'); if(!c2) return;
   const W2=cv.width, H2=cv.height; c2.clearRect(0,0,W2,H2);
-  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.34, W2*0.20), groundY=0.90*H2;   // big head, sized to fit the roam strip
-  const lift=Math.max(0,0.50-_la.hy);                   // how high above the ground rest
-  const sa=0.28*(1-lift*1.5), sw=R*1.0*(1-lift*0.9);
-  if(sa>0.02){ c2.save(); c2.globalAlpha=sa; c2.fillStyle='#000';
-    c2.beginPath(); c2.ellipse(hx, groundY+R*0.06, Math.max(4,sw), Math.max(2,R*0.18), 0,0,7); c2.fill(); c2.restore(); }
-  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R,(LOBBY_HEAD[_la.char]||LOBBY_HEAD_DEF));
+  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.34, W2*0.20);   // big head, sized to fit the roam strip
+  const cutY=hy + LOBBY_GROUND_CUT*R;                   // b96 pitch line at the neck — head rises out of the pitch, follows the bob
+  const lift=Math.max(0,0.50-_la.hy);                   // airborne fade for the ground contact pool
+  const sa=0.30*(1-lift*1.5), sw=R*1.5*(1-lift*0.9);
+  if(sa>0.02){ c2.save(); c2.globalAlpha=sa; c2.fillStyle='#06140d';
+    c2.beginPath(); c2.ellipse(hx, cutY, Math.max(6,sw), Math.max(3,R*0.20), 0,0,7); c2.fill(); c2.restore(); }
+  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R,cutY);
   if(_la.bshow) laDrawBall(c2, _la.bx*W2, _la.by*H2, R*0.32);
 }
 let _inviteMsgT=null;
@@ -3568,12 +3570,12 @@ function enterMatchChrome(){
   if($('potTag')) $('potTag').style.bottom=b; if($('pingTag')) $('pingTag').style.bottom=b;
   checkOrient();
 }
-// nudge phones into landscape during a match (the field is 1060x650 — portrait is unplayable).
-// Menus stay usable in portrait; the hint only blocks once a game is actually being played.
+// b96: ENFORCE landscape GLOBALLY (lobby + in-match). Portrait is blocked entirely on touch devices —
+// the styled full-screen lock is shown and hard-blocks all interaction until the phone is landscape.
+// (Desktop is never touch, so it's unaffected.)
 function checkOrient(){
   const portrait = window.innerHeight > window.innerWidth;
-  const playing = (state==='play' || state==='paused');
-  document.body.classList.toggle('show-rotate', IS_TOUCH && portrait && playing);
+  document.body.classList.toggle('show-rotate', IS_TOUCH && portrait);
 }
 addEventListener('resize', checkOrient);
 addEventListener('orientationchange', ()=>setTimeout(checkOrient,150));

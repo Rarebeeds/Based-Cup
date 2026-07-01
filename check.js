@@ -2199,14 +2199,115 @@ async function syncEquippedFromCloud(){ if(!sb||!sbUser) return;
   try{ const {data}=await sb.from('profiles').select('equipped').eq('id',sbUser.id).single();
     if(data && data.equipped && STATS[data.equipped]){ DB.set(equipKey(), data.equipped); loadEquipped(); } }catch(_){} }
 function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=STATS[equippedChar]?STATS[equippedChar].name:'your character'; renderLobbyShowcase(); }
-// b90 UI REMODEL: render the central lobby showcase — equipped sprite in front of their ore-tier holo card.
-// Reads the equipped value; called on equip change (updateLockerBtn) + on entering the lobby. Null-guarded.
+// b93 UI REMODEL: render the lobby showcase — flippable stats BANNER (front=mechanics, back=your record)
+// above a LIVING animated character. Reads the equipped value; called on equip change + on entering the
+// lobby. Display-only (equip stays in the Locker). Null-guarded so it can never throw / dead-screen.
+function lobbyBannerFront(c){
+  const s=STATS[c];
+  const bar=(lbl,v,lo,hi)=>{ const pct=Math.max(4,Math.min(100,Math.round((v-lo)/(hi-lo)*100)));
+    return '<div class="lbStat"><span class="lbSL">'+lbl+'</span><span class="lbSB"><i style="width:'+pct+'%"></i></span><span class="lbSV">'+v+'</span></div>'; };
+  return bar('GRAB',s.grab,46,52) + bar('PACE',s.pace,0,20) + bar('DEF',s.def,0,20) + bar('STA',s.sta,0,20)
+       + bar('DRIB',s.drb,0,20) + bar('POW',s.pow,0,20) + bar('DIV',s.div,0,20);
+}
+function lobbyBannerBack(c){
+  const r=getCharRecord(c);   // reuse the Locker card-back data/store (no rebuild)
+  const row=(l,v)=>'<div class="lbRow"><span>'+l+'</span><b>'+v+'</b></div>';
+  return row('Win / Loss', r.wins+' / '+r.losses) + row('Goals F / A', r.gf+' / '+r.ga)
+       + row('Own goals', r.og) + row('Dribble %', recPct(r.dribbleOk,r.dribbleTry))
+       + row('Tackle %', recPct(r.tackleOk,r.tackleTry)) + row('Cards', '🟨'+r.yellow+' 🟥'+r.red);
+}
 function renderLobbyShowcase(){
   const c=(STATS[equippedChar]&&isOwned(equippedChar))?equippedChar:'pepe';
-  const hero=document.getElementById('lobbyHero'); if(hero){ const im=imgFor(c); hero.src=(im&&im.src)||''; }
-  const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
+  const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker ore-tier styling; also resets to FRONT on equip change
   const ov=document.getElementById('lobbyOvr'); if(ov) ov.textContent=overallOf(c);
-  const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker's ore-tier styling
+  const tn=document.getElementById('lobbyTierName'); if(tn) tn.textContent=oreTier(c).toUpperCase();
+  const st=document.getElementById('lobbyBannerStats'); if(st) st.innerHTML=lobbyBannerFront(c);
+  const rec=document.getElementById('lobbyBannerRec'); if(rec) rec.innerHTML=lobbyBannerBack(c);
+  const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
+  const hero=document.getElementById('lobbyHero'); if(hero){ const im=imgFor(c); hero.src=(im&&im.src)||''; }   // kept (hidden) — harmless
+  lobbyAnimSetChar(c); lobbyAnimStart();   // (re)start the living-character animation for the equipped char
+}
+// ===== b93: LIVING CHARACTER lobby animation — procedural, on a dedicated canvas, MENU-ONLY (self-stops
+//       when the lobby isn't visible so it never runs during a match / burns battery). Light + efficient. =====
+const LA_MOVES=['keepups','dribble','jog','celebrate'];
+let _laReq=0, _laLast=0, _la=null;
+function lobbyAnimSetChar(c){ if(_la){ _la.char=c; _la.img=imgFor(c); } }
+function lobbyAnimResize(){ const cv=document.getElementById('lobbyCharCv'); if(!cv||!cv.getBoundingClientRect) return;
+  const r=cv.getBoundingClientRect(), dpr=Math.min(2,(window.devicePixelRatio||1));
+  const w=Math.max(1,Math.round((r.width||260)*dpr)), h=Math.max(1,Math.round((r.height||180)*dpr));
+  if(cv.width!==w) cv.width=w; if(cv.height!==h) cv.height=h; }
+function lobbyPickMove(){ let m; do{ m=LA_MOVES[Math.floor(Math.random()*LA_MOVES.length)]; }while(m===_la.move);
+  _la.move=m; _la.t=0; _la.dur=({jog:2.4,dribble:3.2,keepups:4.4,celebrate:2.4})[m]||2.6; }
+function lobbyAnimStart(){
+  const cv=document.getElementById('lobbyCharCv'); if(!cv) return;
+  if(!_la) _la={ move:'jog', t:0, dur:2.4, char:equippedChar, img:imgFor(equippedChar),
+    hx:0.5, hy:0.46, hrot:0, face:1, bx:0.5, by:0.8, bshow:false, sized:false };
+  _la.sized=false; lobbyAnimResize();
+  if(_laReq) return;   // already looping
+  _laLast=(typeof performance!=='undefined'&&performance.now)?performance.now():0;
+  _laReq=requestAnimationFrame(lobbyFrame);
+}
+function lobbyFrame(now){
+  _laReq=0;
+  const cv=document.getElementById('lobbyCharCv'), ss=document.getElementById('startScreen');
+  if(!cv||!ss||ss.classList.contains('hide')) return;   // MENU-ONLY: stop when the lobby isn't shown
+  if(!_la.sized){ lobbyAnimResize(); _la.sized=true; }   // re-fit once after layout settles
+  let dt=(now-_laLast)/1000; if(!(dt>=0))dt=0; if(dt>0.05)dt=0.05; _laLast=now;
+  lobbyAnimStep(dt); lobbyAnimDraw(cv);
+  _laReq=requestAnimationFrame(lobbyFrame);
+}
+function lobbyAnimStep(dt){
+  _la.t+=dt; if(_la.t>=_la.dur) lobbyPickMove();
+  const tt=_la.t, cx=0.5, headY=0.46, groundY=0.86, M=_la.move;
+  let thx=cx, thy=headY, throt=0, tface=1, tbx=cx, tby=groundY-0.05, tbshow=false;
+  if(M==='jog'){
+    thy=headY - Math.abs(Math.sin(tt*7))*0.05; throt=Math.sin(tt*7)*0.05;
+  } else if(M==='dribble'){
+    thx=cx + Math.sin(tt*2.3)*0.20; thy=headY - Math.abs(Math.sin(tt*4.6))*0.03; throt=-Math.cos(tt*2.3)*0.13;
+    tface=Math.cos(tt*2.3)>=0?1:-1;
+    tbshow=true; tbx=cx + Math.sin(tt*2.3+0.5)*0.24; tby=groundY - Math.abs(Math.sin(tt*4.6))*0.05;
+  } else if(M==='keepups'){
+    tbshow=true;
+    if(tt <= _la.dur-1.1){                              // juggling
+      const bnc=Math.abs(Math.sin(tt*2.7));
+      tby=headY - 0.10 - bnc*0.30; tbx=cx + Math.sin(tt*1.3)*0.03;
+      thy=headY - Math.max(0,Math.sin(tt*2.7))*0.035; throt=Math.sin(tt*2.7)*0.05;
+    } else {                                            // finish on a BACKFLIP + landing
+      const fp=(tt-(_la.dur-1.1))/1.1;                  // 0..1
+      throt=fp*Math.PI*2; thy=headY - Math.sin(fp*Math.PI)*0.22; thx=cx - Math.sin(fp*Math.PI)*0.05;
+      tby=headY - 0.26 + fp*0.34; tbx=cx+0.05;
+    }
+  } else if(M==='celebrate'){
+    const hop=Math.abs(Math.sin(tt*3.4));
+    thy=headY - hop*0.11; throt=Math.sin(tt*7)*0.16; thx=cx + Math.sin(tt*3.4)*0.03;
+  }
+  const k=0.18;   // ease actual->target => SMOOTH transitions between moves
+  _la.hx+=(thx-_la.hx)*k; _la.hy+=(thy-_la.hy)*k; _la.bx+=(tbx-_la.bx)*k; _la.by+=(tby-_la.by)*k;
+  _la.hrot=throt;                                        // rotation is continuous (moves end near 0 / 2π) — no jump
+  _la.face=(M==='dribble')?tface:1;
+  _la.bshow=tbshow;
+}
+function laDrawHead(c2,img,x,y,rot,face,R){
+  if(!(img&&img.complete&&img.naturalWidth)) return;
+  const iw=img.naturalWidth, ih=img.naturalHeight, s=(R*FACE_FIT)/(iw*FACE_RF);
+  c2.save(); c2.translate(x,y); c2.rotate(rot); if(face<0)c2.scale(-1,1);
+  c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s); c2.restore();
+}
+function laDrawBall(c2,x,y,r){
+  c2.save(); c2.beginPath(); c2.arc(x,y,r,0,7); c2.fillStyle='#fff'; c2.fill();
+  c2.lineWidth=Math.max(1,r*0.13); c2.strokeStyle='#1b1b1b'; c2.stroke();
+  c2.fillStyle='#161616'; c2.beginPath(); c2.arc(x,y-r*0.28,r*0.30,0,7); c2.fill(); c2.restore();
+}
+function lobbyAnimDraw(cv){
+  const c2=cv.getContext&&cv.getContext('2d'); if(!c2) return;
+  const W2=cv.width, H2=cv.height; c2.clearRect(0,0,W2,H2);
+  const hx=_la.hx*W2, hy=_la.hy*H2, R=H2*0.30, groundY=0.86*H2;
+  const lift=Math.max(0,0.46-_la.hy);                   // how high the head is above rest
+  const sa=0.30*(1-lift*1.7), sw=R*1.05*(1-lift*1.1);
+  if(sa>0.02){ c2.save(); c2.globalAlpha=sa; c2.fillStyle='#000';
+    c2.beginPath(); c2.ellipse(hx, groundY+R*0.16, Math.max(4,sw), Math.max(2,R*0.22), 0,0,7); c2.fill(); c2.restore(); }
+  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R);
+  if(_la.bshow) laDrawBall(c2, _la.bx*W2, _la.by*H2, R*0.34);
 }
 let _inviteMsgT=null;
 function showInviteMsg(){ const m=document.getElementById('inviteMsg'); if(!m) return;
@@ -2410,6 +2511,10 @@ $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedCh
 (function(){ const map={lobbyQuick:'msQuickBtn', lobbyWager:'msWagerBtn', lobbyFriend:'msFriendBtn'};
   for(const id in map){ const chip=$(id), target=$(map[id]);
     if(chip && target) chip.onclick=()=>{ audioInit(); target.click(); }; } })();
+// b93: tap the stats banner to FLIP front(mechanics)<->back(your record). Display-only — cannot change character.
+(function(){ const card=$('lobbyCard'); if(card) card.addEventListener('click',()=>card.classList.toggle('flip')); })();
+// keep the living-character canvas fitted to its box on resize/orientation change (only matters on the lobby)
+addEventListener('resize',()=>{ const ss=$('startScreen'); if(ss && !ss.classList.contains('hide')){ lobbyAnimResize(); if(_la) _la.sized=false; } });
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
 let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;

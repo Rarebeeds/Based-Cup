@@ -688,30 +688,62 @@
   #lobbyControls{ display:none }
   #startScreen kbd{ background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-bottom-width:3px;color:#eafaf0 }
 
-  /* ---- CHARACTER SHOWCASE: hero-sized sprite in FRONT of their ore-tier holo card ---- */
-  #lobbyStage{ grid-area:stage;align-self:center;position:relative;display:flex;align-items:center;justify-content:center;gap:min(4vw,44px) }
-  #lobbyShowcase{ position:relative;width:min(340px,80vw);height:min(430px,54vh);flex:0 0 auto;
-    display:flex;align-items:flex-end;justify-content:center }
-  .lobbyCard{ position:absolute;left:50%;top:3%;transform:translateX(-50%);width:60%;aspect-ratio:5/7;
-    border-radius:20px;border:2px solid var(--fc-line);background:var(--fc-card);box-shadow:var(--fc-shadow);overflow:hidden }
-  .lobbyCard::after{ content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--fc-accent),var(--fc-accent2)) }
-  .lobbyCard .lobbySheen{ position:absolute;inset:0;pointer-events:none;
+  /* ---- SHOWCASE (b93): flippable STATS BANNER above a LIVING animated character ---- */
+  #lobbyStage{ grid-area:stage;align-self:center;position:relative;display:flex;align-items:center;justify-content:center;gap:min(3.5vw,34px) }
+  #lobbyShowcase{ position:relative;flex:0 0 auto;width:min(360px,84vw);display:flex;flex-direction:column;align-items:center;gap:10px }
+
+  /* flippable card banner */
+  .lobbyCard{ position:relative;width:100%;aspect-ratio:2/1;perspective:1100px;cursor:pointer;-webkit-tap-highlight-color:transparent }
+  #lobbyBannerFlip{ position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,.05,.2,1) }
+  .lobbyCard.flip #lobbyBannerFlip{ transform:rotateY(180deg) }
+  .lbFace{ position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;overflow:hidden;
+    border:2px solid var(--fc-line);box-shadow:var(--fc-shadow);background:var(--fc-card);display:flex;padding:12px 14px;gap:12px }
+  .lbFace::after{ content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--fc-accent),var(--fc-accent2)) }
+  .lbBack{ transform:rotateY(180deg);flex-direction:column;padding:9px 14px;gap:5px }
+  .lobbyCard .lobbySheen{ position:absolute;inset:0;pointer-events:none;z-index:1;
     background:linear-gradient(125deg,rgba(110,215,255,.20),rgba(180,120,255,.14) 30%,transparent 48%,transparent 60%,rgba(255,220,140,.18)) }
-  #lobbyOvr{ position:absolute;top:5%;left:9%;z-index:3;font-family:'Oswald','Arial Narrow',sans-serif;
-    font-weight:700;font-size:clamp(22px,3vw,34px);line-height:1;color:var(--fc-ink) }
-  /* ore-tier backdrops — reuse the Locker's exact gradients/glows */
-  .lobbyCard.tier-stone{ border-color:#aeb4bc;background:linear-gradient(165deg,#f4f5f7,#e0e3e8) }
-  .lobbyCard.tier-iron{ border-color:#c2c8d0;background:linear-gradient(165deg,#fdfdfe,#dde1e7);box-shadow:0 0 0 1px rgba(150,160,172,.3),var(--fc-shadow) }
-  .lobbyCard.tier-gold{ border-color:#e7b53b;background:linear-gradient(165deg,#fffdf3,#f6e6bd);box-shadow:0 0 0 1px rgba(231,181,59,.55),0 14px 48px rgba(231,181,59,.5) }
-  .lobbyCard.tier-diamond{ border-color:#4fd0e6;background:linear-gradient(165deg,#f2feff,#cbf0f8);box-shadow:0 0 0 1px rgba(79,208,230,.6),0 14px 48px rgba(79,208,230,.55) }
-  .lobbyCard.tier-netherite{ border-color:#7d5aa0;background:linear-gradient(165deg,#2b2536,#15121d);box-shadow:0 0 0 1px rgba(150,110,200,.65),0 16px 54px rgba(120,70,170,.65) }
-  .lobbyCard.tier-netherite #lobbyOvr{ color:#efe6ff }
-  #lobbyHero{ position:relative;z-index:2;width:96%;height:auto;max-height:98%;object-fit:contain;
-    filter:drop-shadow(0 20px 26px rgba(0,0,0,.55));margin-bottom:7% }
-  #lobbyHeroName{ position:absolute;z-index:4;bottom:0;left:50%;transform:translateX(-50%);
-    font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(14px,1.8vw,18px);letter-spacing:2px;color:var(--fc-ink);
-    background:var(--fc-card);border:1px solid var(--fc-line);border-radius:20px;padding:5px 18px;
-    box-shadow:0 8px 20px rgba(0,0,0,.35);white-space:nowrap }
+  .lbFlipHint{ position:absolute;bottom:5px;right:10px;z-index:5;font-family:'Oswald','Arial Narrow',sans-serif;
+    font-size:9px;letter-spacing:1.5px;color:var(--fc-ink2);opacity:.7;pointer-events:none }
+  /* front: OVR + tier (left) · stat bars (right) */
+  .lbFrontHead{ display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:76px;
+    border-right:1px solid var(--fc-line);padding-right:10px;z-index:2 }
+  .lbOvrWrap{ display:flex;flex-direction:column;align-items:center;line-height:.9 }
+  #lobbyOvr{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(30px,6.2vw,46px);color:var(--fc-ink) }
+  .lbOvrLbl{ font-family:'Oswald','Arial Narrow',sans-serif;font-size:10px;letter-spacing:3px;color:var(--fc-ink2) }
+  .lbTierName{ margin-top:5px;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:var(--fc-ink2) }
+  .lbStats{ flex:1;display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;align-content:center;z-index:2 }
+  .lbStat{ display:flex;align-items:center;gap:6px;font-family:'Oswald','Arial Narrow',sans-serif;font-size:10px;letter-spacing:.5px }
+  .lbStat .lbSL{ width:34px;color:var(--fc-ink2);flex:none }
+  .lbStat .lbSB{ flex:1;height:5px;border-radius:3px;background:rgba(16,36,58,.14);overflow:hidden }
+  .lbStat .lbSB i{ display:block;height:100%;background:linear-gradient(90deg,var(--fc-accent),var(--fc-accent2));border-radius:3px }
+  .lbStat .lbSV{ width:16px;text-align:right;color:var(--fc-ink);font-weight:700;flex:none }
+  /* back: your record */
+  .lbBackHead{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:var(--fc-accent);text-align:center;z-index:2 }
+  .lbRec{ flex:1;display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;align-content:center;z-index:2 }
+  .lbRow{ display:flex;justify-content:space-between;gap:8px;font-family:'Oswald','Arial Narrow',sans-serif;font-size:10.5px;color:var(--fc-ink2) }
+  .lbRow b{ color:var(--fc-ink);font-weight:700 }
+  /* ore-tier front-face styling (reuse the Locker gradients/glows) */
+  .lobbyCard.tier-stone .lbFront{ border-color:#aeb4bc;background:linear-gradient(165deg,#f4f5f7,#e0e3e8) }
+  .lobbyCard.tier-iron .lbFront{ border-color:#c2c8d0;background:linear-gradient(165deg,#fdfdfe,#dde1e7) }
+  .lobbyCard.tier-gold .lbFront{ border-color:#e7b53b;background:linear-gradient(165deg,#fffdf3,#f6e6bd) }
+  .lobbyCard.tier-gold{ filter:drop-shadow(0 10px 30px rgba(231,181,59,.4)) }
+  .lobbyCard.tier-diamond .lbFront{ border-color:#4fd0e6;background:linear-gradient(165deg,#f2feff,#cbf0f8) }
+  .lobbyCard.tier-diamond{ filter:drop-shadow(0 10px 30px rgba(79,208,230,.4)) }
+  .lobbyCard.tier-netherite .lbFront{ border-color:#7d5aa0;background:linear-gradient(165deg,#2b2536,#15121d) }
+  .lobbyCard.tier-netherite{ filter:drop-shadow(0 12px 34px rgba(120,70,170,.55)) }
+  .lobbyCard.tier-netherite .lbFront #lobbyOvr,.lobbyCard.tier-netherite .lbFront .lbOvrLbl,.lobbyCard.tier-netherite .lbFront .lbTierName{ color:#efe6ff }
+  .lobbyCard.tier-netherite .lbFront .lbStat .lbSL{ color:#c7b8e0 } .lobbyCard.tier-netherite .lbFront .lbStat .lbSV{ color:#fff }
+  .lobbyCard.tier-netherite .lbFront .lbFrontHead{ border-right-color:rgba(200,170,240,.25) }
+  .lobbyCard.tier-netherite .lbFront .lbStat .lbSB{ background:rgba(255,255,255,.16) }
+
+  /* living character box — his own mini-pitch container, aligned with the banner width */
+  #lobbyCharBox{ position:relative;width:100%;aspect-ratio:3/2;border-radius:18px;overflow:hidden;
+    background:radial-gradient(120% 100% at 50% 122%,rgba(120,240,170,.20),transparent 60%),linear-gradient(180deg,rgba(6,26,16,.52),rgba(4,16,10,.64));
+    border:1px solid rgba(255,255,255,.13);box-shadow:0 14px 34px rgba(0,0,0,.42) }
+  #lobbyCharCv{ position:absolute;inset:0;width:100%;height:100%;display:block }
+  #lobbyHeroName{ position:absolute;z-index:2;bottom:8px;left:50%;transform:translateX(-50%);
+    font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(13px,1.7vw,16px);letter-spacing:2px;color:var(--fc-ink);
+    background:var(--fc-card);border:1px solid var(--fc-line);border-radius:20px;padding:3px 16px;box-shadow:0 6px 16px rgba(0,0,0,.35);white-space:nowrap }
 
   /* ---- INVITE SLOT (placeholder foundation for 2v2) — beside the character, not in a box ---- */
   #inviteSlot{ position:relative;width:min(130px,26vw);height:min(300px,40vh);flex:0 0 auto;border-radius:18px;
@@ -749,10 +781,13 @@
     .lobbyRail .btn{ width:auto;font-size:12px;padding:10px 6px;white-space:nowrap;letter-spacing:.5px }
     #lobbyRailL #lockerBtn{ grid-column:1 / -1 }          /* LOCKER (has the char name) gets its own full-width row */
     #startScreen #menuBoard{ display:none }               /* leaderboard BUTTON still present; the preview panel is desktop-only */
-    #lobbyStage{ gap:10px }
-    #lobbyShowcase{ width:min(220px,56vw);height:min(320px,40vh) }
-    #inviteSlot{ width:min(96px,24vw);height:min(230px,30vh) }
+    #lobbyStage{ gap:9px }
+    #lobbyShowcase{ width:min(248px,64vw) }              /* banner+character column; height is content-driven */
+    #inviteSlot{ width:min(84px,22vw);height:min(240px,32vh);align-self:center }
     #inviteSlot .inviteLbl{ font-size:10px }
+    #inviteSlot .invitePlus{ font-size:28px }
+    .lbStats{ gap:2px 8px } .lbStat{ font-size:9px } .lbStat .lbSL{ width:30px }
+    #lobbyCharBox{ aspect-ratio:1/1 }                    /* squarer character box on a phone */
     #startScreen #playBtn{ width:min(360px,88vw);font-size:19px;padding:14px 20px }
     #startScreen #guestBanner{ top:max(58px,calc(env(safe-area-inset-top) + 52px)) }
   }
@@ -771,7 +806,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b92 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b93 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1007,12 +1042,33 @@
         </div>
       </div>
 
-      <!-- CENTRE: equipped-character showcase (hero in front of their ore-tier card) + invite slot -->
+      <!-- CENTRE: flippable STATS BANNER above a LIVING animated character (b93) + invite slot -->
       <div id="lobbyStage">
         <div id="lobbyShowcase" title="Your equipped character — change in the Locker">
-          <div id="lobbyCard" class="lobbyCard tier-stone"><i class="lobbySheen"></i><span id="lobbyOvr">0</span></div>
-          <img id="lobbyHero" alt="">
-          <div id="lobbyHeroName">PEPE</div>
+          <!-- FLIPPABLE stats banner (behind/above the character; tap to flip; display-only, equip stays in the Locker) -->
+          <div id="lobbyCard" class="lobbyCard tier-stone" title="Tap to flip — mechanics / your record">
+            <div id="lobbyBannerFlip">
+              <div class="lbFace lbFront">
+                <i class="lobbySheen"></i>
+                <div class="lbFrontHead">
+                  <div class="lbOvrWrap"><span id="lobbyOvr">0</span><span class="lbOvrLbl">OVR</span></div>
+                  <div class="lbTierName" id="lobbyTierName">STONE</div>
+                </div>
+                <div class="lbStats" id="lobbyBannerStats"></div>
+              </div>
+              <div class="lbFace lbBack">
+                <div class="lbBackHead">YOUR RECORD</div>
+                <div class="lbRec" id="lobbyBannerRec"></div>
+              </div>
+            </div>
+            <div class="lbFlipHint">↻ flip</div>
+          </div>
+          <!-- LIVING CHARACTER — animated (menu-only) in its own box, aligned with the banner above -->
+          <div id="lobbyCharBox">
+            <canvas id="lobbyCharCv"></canvas>
+            <img id="lobbyHero" alt="" style="display:none">
+            <div id="lobbyHeroName">PEPE</div>
+          </div>
         </div>
         <div id="inviteSlot" title="Invite a teammate (coming with 2v2)">
           <span class="invitePlus">＋</span><span class="inviteLbl">SQUAD</span>
@@ -3490,14 +3546,115 @@ async function syncEquippedFromCloud(){ if(!sb||!sbUser) return;
   try{ const {data}=await sb.from('profiles').select('equipped').eq('id',sbUser.id).single();
     if(data && data.equipped && STATS[data.equipped]){ DB.set(equipKey(), data.equipped); loadEquipped(); } }catch(_){} }
 function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=STATS[equippedChar]?STATS[equippedChar].name:'your character'; renderLobbyShowcase(); }
-// b90 UI REMODEL: render the central lobby showcase — equipped sprite in front of their ore-tier holo card.
-// Reads the equipped value; called on equip change (updateLockerBtn) + on entering the lobby. Null-guarded.
+// b93 UI REMODEL: render the lobby showcase — flippable stats BANNER (front=mechanics, back=your record)
+// above a LIVING animated character. Reads the equipped value; called on equip change + on entering the
+// lobby. Display-only (equip stays in the Locker). Null-guarded so it can never throw / dead-screen.
+function lobbyBannerFront(c){
+  const s=STATS[c];
+  const bar=(lbl,v,lo,hi)=>{ const pct=Math.max(4,Math.min(100,Math.round((v-lo)/(hi-lo)*100)));
+    return '<div class="lbStat"><span class="lbSL">'+lbl+'</span><span class="lbSB"><i style="width:'+pct+'%"></i></span><span class="lbSV">'+v+'</span></div>'; };
+  return bar('GRAB',s.grab,46,52) + bar('PACE',s.pace,0,20) + bar('DEF',s.def,0,20) + bar('STA',s.sta,0,20)
+       + bar('DRIB',s.drb,0,20) + bar('POW',s.pow,0,20) + bar('DIV',s.div,0,20);
+}
+function lobbyBannerBack(c){
+  const r=getCharRecord(c);   // reuse the Locker card-back data/store (no rebuild)
+  const row=(l,v)=>'<div class="lbRow"><span>'+l+'</span><b>'+v+'</b></div>';
+  return row('Win / Loss', r.wins+' / '+r.losses) + row('Goals F / A', r.gf+' / '+r.ga)
+       + row('Own goals', r.og) + row('Dribble %', recPct(r.dribbleOk,r.dribbleTry))
+       + row('Tackle %', recPct(r.tackleOk,r.tackleTry)) + row('Cards', '🟨'+r.yellow+' 🟥'+r.red);
+}
 function renderLobbyShowcase(){
   const c=(STATS[equippedChar]&&isOwned(equippedChar))?equippedChar:'pepe';
-  const hero=document.getElementById('lobbyHero'); if(hero){ const im=imgFor(c); hero.src=(im&&im.src)||''; }
-  const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
+  const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker ore-tier styling; also resets to FRONT on equip change
   const ov=document.getElementById('lobbyOvr'); if(ov) ov.textContent=overallOf(c);
-  const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker's ore-tier styling
+  const tn=document.getElementById('lobbyTierName'); if(tn) tn.textContent=oreTier(c).toUpperCase();
+  const st=document.getElementById('lobbyBannerStats'); if(st) st.innerHTML=lobbyBannerFront(c);
+  const rec=document.getElementById('lobbyBannerRec'); if(rec) rec.innerHTML=lobbyBannerBack(c);
+  const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
+  const hero=document.getElementById('lobbyHero'); if(hero){ const im=imgFor(c); hero.src=(im&&im.src)||''; }   // kept (hidden) — harmless
+  lobbyAnimSetChar(c); lobbyAnimStart();   // (re)start the living-character animation for the equipped char
+}
+// ===== b93: LIVING CHARACTER lobby animation — procedural, on a dedicated canvas, MENU-ONLY (self-stops
+//       when the lobby isn't visible so it never runs during a match / burns battery). Light + efficient. =====
+const LA_MOVES=['keepups','dribble','jog','celebrate'];
+let _laReq=0, _laLast=0, _la=null;
+function lobbyAnimSetChar(c){ if(_la){ _la.char=c; _la.img=imgFor(c); } }
+function lobbyAnimResize(){ const cv=document.getElementById('lobbyCharCv'); if(!cv||!cv.getBoundingClientRect) return;
+  const r=cv.getBoundingClientRect(), dpr=Math.min(2,(window.devicePixelRatio||1));
+  const w=Math.max(1,Math.round((r.width||260)*dpr)), h=Math.max(1,Math.round((r.height||180)*dpr));
+  if(cv.width!==w) cv.width=w; if(cv.height!==h) cv.height=h; }
+function lobbyPickMove(){ let m; do{ m=LA_MOVES[Math.floor(Math.random()*LA_MOVES.length)]; }while(m===_la.move);
+  _la.move=m; _la.t=0; _la.dur=({jog:2.4,dribble:3.2,keepups:4.4,celebrate:2.4})[m]||2.6; }
+function lobbyAnimStart(){
+  const cv=document.getElementById('lobbyCharCv'); if(!cv) return;
+  if(!_la) _la={ move:'jog', t:0, dur:2.4, char:equippedChar, img:imgFor(equippedChar),
+    hx:0.5, hy:0.46, hrot:0, face:1, bx:0.5, by:0.8, bshow:false, sized:false };
+  _la.sized=false; lobbyAnimResize();
+  if(_laReq) return;   // already looping
+  _laLast=(typeof performance!=='undefined'&&performance.now)?performance.now():0;
+  _laReq=requestAnimationFrame(lobbyFrame);
+}
+function lobbyFrame(now){
+  _laReq=0;
+  const cv=document.getElementById('lobbyCharCv'), ss=document.getElementById('startScreen');
+  if(!cv||!ss||ss.classList.contains('hide')) return;   // MENU-ONLY: stop when the lobby isn't shown
+  if(!_la.sized){ lobbyAnimResize(); _la.sized=true; }   // re-fit once after layout settles
+  let dt=(now-_laLast)/1000; if(!(dt>=0))dt=0; if(dt>0.05)dt=0.05; _laLast=now;
+  lobbyAnimStep(dt); lobbyAnimDraw(cv);
+  _laReq=requestAnimationFrame(lobbyFrame);
+}
+function lobbyAnimStep(dt){
+  _la.t+=dt; if(_la.t>=_la.dur) lobbyPickMove();
+  const tt=_la.t, cx=0.5, headY=0.46, groundY=0.86, M=_la.move;
+  let thx=cx, thy=headY, throt=0, tface=1, tbx=cx, tby=groundY-0.05, tbshow=false;
+  if(M==='jog'){
+    thy=headY - Math.abs(Math.sin(tt*7))*0.05; throt=Math.sin(tt*7)*0.05;
+  } else if(M==='dribble'){
+    thx=cx + Math.sin(tt*2.3)*0.20; thy=headY - Math.abs(Math.sin(tt*4.6))*0.03; throt=-Math.cos(tt*2.3)*0.13;
+    tface=Math.cos(tt*2.3)>=0?1:-1;
+    tbshow=true; tbx=cx + Math.sin(tt*2.3+0.5)*0.24; tby=groundY - Math.abs(Math.sin(tt*4.6))*0.05;
+  } else if(M==='keepups'){
+    tbshow=true;
+    if(tt <= _la.dur-1.1){                              // juggling
+      const bnc=Math.abs(Math.sin(tt*2.7));
+      tby=headY - 0.10 - bnc*0.30; tbx=cx + Math.sin(tt*1.3)*0.03;
+      thy=headY - Math.max(0,Math.sin(tt*2.7))*0.035; throt=Math.sin(tt*2.7)*0.05;
+    } else {                                            // finish on a BACKFLIP + landing
+      const fp=(tt-(_la.dur-1.1))/1.1;                  // 0..1
+      throt=fp*Math.PI*2; thy=headY - Math.sin(fp*Math.PI)*0.22; thx=cx - Math.sin(fp*Math.PI)*0.05;
+      tby=headY - 0.26 + fp*0.34; tbx=cx+0.05;
+    }
+  } else if(M==='celebrate'){
+    const hop=Math.abs(Math.sin(tt*3.4));
+    thy=headY - hop*0.11; throt=Math.sin(tt*7)*0.16; thx=cx + Math.sin(tt*3.4)*0.03;
+  }
+  const k=0.18;   // ease actual->target => SMOOTH transitions between moves
+  _la.hx+=(thx-_la.hx)*k; _la.hy+=(thy-_la.hy)*k; _la.bx+=(tbx-_la.bx)*k; _la.by+=(tby-_la.by)*k;
+  _la.hrot=throt;                                        // rotation is continuous (moves end near 0 / 2π) — no jump
+  _la.face=(M==='dribble')?tface:1;
+  _la.bshow=tbshow;
+}
+function laDrawHead(c2,img,x,y,rot,face,R){
+  if(!(img&&img.complete&&img.naturalWidth)) return;
+  const iw=img.naturalWidth, ih=img.naturalHeight, s=(R*FACE_FIT)/(iw*FACE_RF);
+  c2.save(); c2.translate(x,y); c2.rotate(rot); if(face<0)c2.scale(-1,1);
+  c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s); c2.restore();
+}
+function laDrawBall(c2,x,y,r){
+  c2.save(); c2.beginPath(); c2.arc(x,y,r,0,7); c2.fillStyle='#fff'; c2.fill();
+  c2.lineWidth=Math.max(1,r*0.13); c2.strokeStyle='#1b1b1b'; c2.stroke();
+  c2.fillStyle='#161616'; c2.beginPath(); c2.arc(x,y-r*0.28,r*0.30,0,7); c2.fill(); c2.restore();
+}
+function lobbyAnimDraw(cv){
+  const c2=cv.getContext&&cv.getContext('2d'); if(!c2) return;
+  const W2=cv.width, H2=cv.height; c2.clearRect(0,0,W2,H2);
+  const hx=_la.hx*W2, hy=_la.hy*H2, R=H2*0.30, groundY=0.86*H2;
+  const lift=Math.max(0,0.46-_la.hy);                   // how high the head is above rest
+  const sa=0.30*(1-lift*1.7), sw=R*1.05*(1-lift*1.1);
+  if(sa>0.02){ c2.save(); c2.globalAlpha=sa; c2.fillStyle='#000';
+    c2.beginPath(); c2.ellipse(hx, groundY+R*0.16, Math.max(4,sw), Math.max(2,R*0.22), 0,0,7); c2.fill(); c2.restore(); }
+  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R);
+  if(_la.bshow) laDrawBall(c2, _la.bx*W2, _la.by*H2, R*0.34);
 }
 let _inviteMsgT=null;
 function showInviteMsg(){ const m=document.getElementById('inviteMsg'); if(!m) return;
@@ -3701,6 +3858,10 @@ $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedCh
 (function(){ const map={lobbyQuick:'msQuickBtn', lobbyWager:'msWagerBtn', lobbyFriend:'msFriendBtn'};
   for(const id in map){ const chip=$(id), target=$(map[id]);
     if(chip && target) chip.onclick=()=>{ audioInit(); target.click(); }; } })();
+// b93: tap the stats banner to FLIP front(mechanics)<->back(your record). Display-only — cannot change character.
+(function(){ const card=$('lobbyCard'); if(card) card.addEventListener('click',()=>card.classList.toggle('flip')); })();
+// keep the living-character canvas fitted to its box on resize/orientation change (only matters on the lobby)
+addEventListener('resize',()=>{ const ss=$('startScreen'); if(ss && !ss.classList.contains('hide')){ lobbyAnimResize(); if(_la) _la.sized=false; } });
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
 let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;

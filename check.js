@@ -274,7 +274,12 @@ function mkPlayer(x,y,who,char){ const d=statDerived(char);
     cards:0, out:false}; }                                    // b85: cards (0=clean,1=yellow,2=red) + removed-from-match flag
 function reset(concededBy){
   const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
-  players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };
+  const prev = players;   // b97: PRESERVE persistent per-player match state (yellow/red cards + sent-off flag) across
+  players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };   // the rebuild — a goal/half-time
+  if(prev){                                                                          // kickoff must NOT wipe a booking,
+    players.p.cards=prev.p.cards||0; players.p.out=!!prev.p.out;                      // else a 2nd yellow can never
+    players.t.cards=prev.t.cards||0; players.t.out=!!prev.t.out;                      // trigger the red (players exceed
+  }                                                                                  // 2 yellows). newGame() clears it for a fresh match.
   ball={x:W/2,y:H/2,vx:0,vy:0, owner:null, kickLock:18};
   if(concededBy==='t'){ ball.x=W*0.64; ball.vx=1.2; }
   else if(concededBy==='p'){ ball.x=W*0.36; ball.vx=-1.2; }
@@ -283,6 +288,7 @@ function reset(concededBy){
 function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; timeLeft=matchLen(); golden=false;
   clearTimeout(htTimer); hideHalftime();
   setMeta(''); updateHUD(); reset(); goalLock=0;
+  players.p.cards=0; players.p.out=false; players.t.cards=0; players.t.out=false;   // b97: fresh match — clear the card/out state reset() now preserves
   goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
   foulSeq=0; foulSeen=0; foulCardType=0; foulCardSide=''; lungeReq=false;   // b85: fresh card state each match
   slowmoT=0; netSlowmo=false; motionScale=1; camZoom=1; camFocusX=W/2; camFocusY=H/2;
@@ -2822,6 +2828,7 @@ function onRelayData(d){
         if(netRole==='host' && players && players.t && players.t.char!==oppChar){   // ack arrived after reset() -> fix avatar+stats+labels
           const t=players.t; players.t=mkPlayer(t.x,t.y,'t',oppChar);
           players.t.vx=t.vx; players.t.vy=t.vy; players.t.aim=t.aim; players.t.face=t.face; players.t.stamina=t.stamina;
+          players.t.cards=t.cards||0; players.t.out=!!t.out;   // b97: preserve any booking across the avatar rebuild
           const tc=$('tCard').querySelector('.pc-name'); if(tc) tc.textContent=(NET.peerName||STATS[oppChar].name);
           $('tTeam').textContent=STATS[oppChar].abbr; } }
       let amount=d.wagerAck.amount||0; const oppId=d.wagerAck.guestId||null;

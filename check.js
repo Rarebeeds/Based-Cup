@@ -2406,6 +2406,10 @@ $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedCh
   slot.addEventListener('click',e=>{ if(btn && (e.target===btn || btn.contains(e.target))) return; slot.classList.toggle('reveal'); });
   if(btn) btn.addEventListener('click',e=>{ e.stopPropagation(); showInviteMsg(); });
 })();
+// b91 UI REMODEL: bottom-centre game-mode chips reuse the EXISTING mode-hub handlers exactly (no rewire).
+(function(){ const map={lobbyQuick:'msQuickBtn', lobbyWager:'msWagerBtn', lobbyFriend:'msFriendBtn'};
+  for(const id in map){ const chip=$(id), target=$(map[id]);
+    if(chip && target) chip.onclick=()=>{ audioInit(); target.click(); }; } })();
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
 let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;

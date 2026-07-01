@@ -611,101 +611,143 @@
     #lockerScreen .loSlot{width:200px;height:294px;margin:-147px 0 0 -100px}
     #lockerScreen .loArt img{width:112px;height:112px}}
 
-  /* ============ UI REMODEL phase 1 (b90): START MENU -> FIFA-clean Fortnite-style LOBBY.
-     Reuses the Locker design system (--fc-* tokens, Oswald, ore-tier card styling). SCOPED to
-     #startScreen so the Locker + every other screen are untouched; no element IDs renamed/removed. ============ */
-  #startScreen{ --fc-bg1:#eef3f8;--fc-bg2:#d9e3ee;--fc-ink:#10243a;--fc-ink2:#5d6e80;
-    --fc-accent:#10a35a;--fc-accent2:#16c97c;--fc-gold:#e7b53b;--fc-card:#ffffff;--fc-line:rgba(16,36,58,.12);
-    --fc-shadow:0 22px 56px rgba(20,44,74,.28);--fc-navy:#27517a;
-    background:linear-gradient(165deg,var(--fc-bg1),var(--fc-bg2));color:var(--fc-ink) }
-  #startScreen .card{ background:var(--fc-card);border:1px solid var(--fc-line);color:var(--fc-ink);
-    width:540px;max-width:94%;padding:18px 20px;border-radius:26px;box-shadow:var(--fc-shadow) }
-  #startScreen .gameTitle{ font-size:36px;margin-bottom:2px }
-  #startScreen .sub,#startScreen .muted{ color:var(--fc-ink2);opacity:1 }
-  #startScreen .muted a{ color:var(--fc-accent) }
-  #startScreen #liveCountMenu{ color:var(--fc-accent);background:rgba(16,163,90,.08);
-    border:1px solid rgba(16,163,90,.18);border-radius:20px;padding:4px 12px;display:inline-block }
-  /* FIFA-clean buttons (scoped): base = white surface; .big-btn = navy CTA (matches the Locker EQUIP) */
+  /* ============ UI REMODEL phase 1 REBUILD (b91): START MENU -> FULL-SCREEN, full-bleed Fortnite lobby.
+     No floating card — the whole viewport IS the room. Zones sit around a SWAPPABLE pitch backdrop.
+     Reuses the Locker design system (--fc-* tokens, Oswald, ore-tier card styling). SCOPED to #startScreen. ============ */
+  #startScreen{ --fc-ink:#10243a;--fc-ink2:#5d6e80;--fc-accent:#10a35a;--fc-accent2:#16c97c;--fc-gold:#e7b53b;
+    --fc-card:#ffffff;--fc-line:rgba(16,36,58,.12);--fc-shadow:0 22px 56px rgba(20,44,74,.32);--fc-navy:#27517a;
+    display:block;padding:0;overflow:hidden;background:#08190f;color:#eafaf0 }
+  /* SWAPPABLE full-screen backdrop (stadium/pitch). To reskin later: change THIS rule (single source). */
+  #lobbyBackdrop{ position:absolute;inset:0;z-index:0;overflow:hidden;
+    background:radial-gradient(150% 92% at 50% 130%,rgba(120,240,170,.20),transparent 56%),
+      linear-gradient(180deg,#061710 0%,#0b311f 30%,#155e37 58%,#2f9e44 100%) }
+  #lobbyBackdrop::before{ content:"";position:absolute;left:-25%;right:-25%;bottom:-3%;height:68%;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.055) 0 5.2%,transparent 5.2% 10.4%);
+    transform:perspective(560px) rotateX(57deg);transform-origin:bottom center;pointer-events:none }
+  #lobbyBackdrop::after{ content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(135% 118% at 50% 24%,transparent 50%,rgba(2,10,6,.8)) }
+
+  /* full-bleed grid: [ top ] / [ railL | stage | railR ] / [ play ] */
+  #lobbyRoot{ position:absolute;inset:0;z-index:1;display:grid;
+    grid-template-columns:minmax(148px,220px) 1fr minmax(148px,220px);
+    grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"top top top" "railL stage railR" "play play play";
+    gap:8px;padding:clamp(10px,1.6vw,18px) clamp(26px,3.2vw,44px);   /* side padding clears the daily/region docks */
+    padding-top:max(12px,env(safe-area-inset-top)) }
+
+  #lobbyTop{ grid-area:top;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none }
+  #lobbyTop>*{ pointer-events:auto }
+  #startScreen .gameTitle{ font-size:clamp(30px,4.6vw,50px);margin:0 }
+  #startScreen .sub{ color:#bfe9cf;opacity:1;font-size:13px;margin:0 }
+  #startScreen #liveCountMenu{ color:#eafaf0;background:rgba(16,163,90,.24);border:1px solid rgba(120,240,170,.4);
+    border-radius:20px;padding:3px 14px;font-size:12px;font-weight:bold;display:inline-block }
+
+  /* edge rails (vertical on desktop) */
+  .lobbyRail{ display:flex;flex-direction:column;gap:10px;align-self:center }
+  #lobbyRailL{ grid-area:railL } #lobbyRailR{ grid-area:railR }
+
+  /* FIFA-clean buttons — white surface pops on the dark stadium */
   #startScreen button.btn{ background:var(--fc-card);color:var(--fc-ink);border:1px solid var(--fc-line);
-    border-radius:14px;box-shadow:0 6px 16px rgba(20,44,74,.10);
-    font-family:'Oswald','Arial Narrow',sans-serif;letter-spacing:1.5px;
+    border-radius:14px;box-shadow:0 8px 20px rgba(0,0,0,.30);width:100%;padding:12px 16px;
+    font-family:'Oswald','Arial Narrow',sans-serif;letter-spacing:1.5px;font-size:15px;
     transition:border-color .15s,box-shadow .15s,transform .06s,filter .15s }
-  #startScreen button.btn:hover{ border-color:var(--fc-ink);box-shadow:0 10px 22px rgba(20,44,74,.16);filter:none }
-  #startScreen button.btn:active{ transform:translateY(1px);box-shadow:0 4px 12px rgba(20,44,74,.14) }
-  #startScreen button.btn.big-btn{ background:linear-gradient(180deg,var(--fc-navy),var(--fc-ink));
-    color:#fff;border:none;box-shadow:0 14px 28px rgba(20,44,74,.32) }
-  #startScreen button.btn.big-btn:hover{ filter:brightness(1.08) }
-  /* role accents as a clean left edge instead of full colour fills */
+  #startScreen button.btn:hover{ border-color:var(--fc-accent);box-shadow:0 12px 26px rgba(0,0,0,.4);filter:none }
+  #startScreen button.btn:active{ transform:translateY(1px) }
   #startScreen .btn.grey,#startScreen .btn.blue,#startScreen .btn.yellow{ background:var(--fc-card);color:var(--fc-ink) }
   #startScreen .btn.grey{ border-left:4px solid var(--fc-ink2) }
   #startScreen .btn.blue{ border-left:4px solid #3b82c4 }
   #startScreen .btn.yellow{ border-left:4px solid var(--fc-gold) }
   #startScreen #lockerBtn{ border-left:4px solid var(--fc-accent) }
   #startScreen #storeBtn{ border-left:4px solid #8a63d2 }
-  #startScreen #menuBoard{ background:var(--fc-card);border:1px solid var(--fc-line) }
-  #startScreen #menuBoard:hover{ border-color:var(--fc-ink) }
+  #startScreen #menuBoard{ background:rgba(255,255,255,.95);border:1px solid var(--fc-line);border-radius:14px;
+    box-shadow:0 8px 20px rgba(0,0,0,.3);cursor:pointer }
+  #startScreen #menuBoard:hover{ border-color:var(--fc-accent) }
   #startScreen #menuBoard .dhead,#startScreen #menuBoard .dhead .sub{ color:var(--fc-ink2) }
   #startScreen .mbrow{ color:var(--fc-ink) } #startScreen .mbrow .mbw{ color:#b8860b }
-  #startScreen .orline{ color:var(--fc-ink2);opacity:1 }
-  #startScreen .orline:before,#startScreen .orline:after{ background:var(--fc-line) }
-  #startScreen .panel{ background:rgba(16,36,58,.035);border:1px solid var(--fc-line);color:var(--fc-ink2) }
-  #startScreen .panel .who.a{ color:var(--fc-accent) } #startScreen .panel .who{ color:var(--fc-ink) }
-  #startScreen .panel .kg{ background:rgba(16,36,58,.05);border:1px solid var(--fc-line) }
-  #startScreen .panel .kg i{ color:var(--fc-ink2) }
-  #startScreen kbd{ background:#eef3f8;border:1px solid var(--fc-line);border-bottom-width:3px;color:var(--fc-ink) }
-  #startScreen #guestBanner{ background:rgba(16,163,90,.08)!important;border:1px solid rgba(16,163,90,.22)!important;color:var(--fc-ink)!important }
-  #startScreen #guestAddWalletBtn{ background:linear-gradient(180deg,var(--fc-navy),var(--fc-ink))!important;color:#fff!important;border:none!important }
 
-  /* ---- central CHARACTER SHOWCASE: equipped sprite in FRONT, ore-tier holo card BEHIND ---- */
-  #lobbyStage{ display:flex;align-items:center;justify-content:center;gap:18px;margin:4px 0 14px;flex-wrap:nowrap;position:relative }
-  #lobbyShowcase{ position:relative;width:188px;height:240px;flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center }
-  .lobbyCard{ position:absolute;left:50%;top:6px;transform:translateX(-50%);width:152px;height:210px;
-    border-radius:18px;border:2px solid var(--fc-line);background:var(--fc-card);box-shadow:var(--fc-shadow);overflow:hidden }
+  /* PRIMARY ACTION ZONE — PLAY + game-mode chips, centre-bottom */
+  #lobbyPlayZone{ grid-area:play;display:flex;flex-direction:column;align-items:center;gap:9px;
+    padding-bottom:max(4px,env(safe-area-inset-bottom)) }
+  #startScreen #playBtn{ width:min(440px,74vw);font-size:21px;padding:16px 24px;border-radius:16px;
+    background:linear-gradient(180deg,var(--fc-navy),var(--fc-ink));color:#fff;border:none;letter-spacing:2px;
+    box-shadow:0 16px 36px rgba(0,0,0,.46) }
+  #startScreen #playBtn:hover{ filter:brightness(1.1);border:none }
+  #lobbyModeRow{ display:flex;gap:8px;justify-content:center;flex-wrap:wrap }
+  .lobbyMode{ cursor:pointer;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;letter-spacing:1px;font-size:13px;
+    color:#eafaf0;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.30);border-radius:20px;padding:8px 16px;
+    transition:background .15s,border-color .15s,transform .06s }
+  .lobbyMode:hover{ background:rgba(255,255,255,.2);border-color:var(--fc-accent2) }
+  .lobbyMode:active{ transform:translateY(1px) }
+
+  /* guest banner (slim top overlay) + controls hint (bottom-left overlay) */
+  #startScreen #guestBanner{ position:absolute;top:max(58px,calc(env(safe-area-inset-top) + 54px));left:50%;transform:translateX(-50%);z-index:5;
+    width:min(430px,92vw);background:rgba(9,24,15,.92)!important;border:1px solid rgba(120,240,170,.42)!important;
+    border-radius:14px;padding:9px 13px!important;color:#eafaf0!important;font-size:12px;text-align:center;margin:0 }
+  #startScreen #guestAddWalletBtn{ background:linear-gradient(180deg,var(--fc-navy),var(--fc-ink))!important;color:#fff!important;border:none!important }
+  /* controls legend is hidden on the premium lobby (kept in the DOM; controls are shown in-match) */
+  #lobbyControls{ display:none }
+  #startScreen kbd{ background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-bottom-width:3px;color:#eafaf0 }
+
+  /* ---- CHARACTER SHOWCASE: hero-sized sprite in FRONT of their ore-tier holo card ---- */
+  #lobbyStage{ grid-area:stage;align-self:center;position:relative;display:flex;align-items:center;justify-content:center;gap:min(4vw,44px) }
+  #lobbyShowcase{ position:relative;width:min(340px,80vw);height:min(430px,54vh);flex:0 0 auto;
+    display:flex;align-items:flex-end;justify-content:center }
+  .lobbyCard{ position:absolute;left:50%;top:3%;transform:translateX(-50%);width:60%;aspect-ratio:5/7;
+    border-radius:20px;border:2px solid var(--fc-line);background:var(--fc-card);box-shadow:var(--fc-shadow);overflow:hidden }
   .lobbyCard::after{ content:"";position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,var(--fc-accent),var(--fc-accent2)) }
   .lobbyCard .lobbySheen{ position:absolute;inset:0;pointer-events:none;
     background:linear-gradient(125deg,rgba(110,215,255,.20),rgba(180,120,255,.14) 30%,transparent 48%,transparent 60%,rgba(255,220,140,.18)) }
-  #lobbyOvr{ position:absolute;top:9px;left:11px;z-index:3;font-family:'Oswald','Arial Narrow',sans-serif;
-    font-weight:700;font-size:26px;line-height:1;color:var(--fc-ink) }
+  #lobbyOvr{ position:absolute;top:5%;left:9%;z-index:3;font-family:'Oswald','Arial Narrow',sans-serif;
+    font-weight:700;font-size:clamp(22px,3vw,34px);line-height:1;color:var(--fc-ink) }
   /* ore-tier backdrops — reuse the Locker's exact gradients/glows */
   .lobbyCard.tier-stone{ border-color:#aeb4bc;background:linear-gradient(165deg,#f4f5f7,#e0e3e8) }
-  .lobbyCard.tier-iron{ border-color:#c2c8d0;background:linear-gradient(165deg,#fdfdfe,#dde1e7);box-shadow:0 0 0 1px rgba(150,160,172,.28),var(--fc-shadow) }
-  .lobbyCard.tier-gold{ border-color:#e7b53b;background:linear-gradient(165deg,#fffdf3,#f6e6bd);box-shadow:0 0 0 1px rgba(231,181,59,.5),0 12px 40px rgba(231,181,59,.4) }
-  .lobbyCard.tier-diamond{ border-color:#4fd0e6;background:linear-gradient(165deg,#f2feff,#cbf0f8);box-shadow:0 0 0 1px rgba(79,208,230,.55),0 12px 40px rgba(79,208,230,.45) }
-  .lobbyCard.tier-netherite{ border-color:#7d5aa0;background:linear-gradient(165deg,#2b2536,#15121d);box-shadow:0 0 0 1px rgba(150,110,200,.6),0 14px 46px rgba(120,70,170,.55) }
+  .lobbyCard.tier-iron{ border-color:#c2c8d0;background:linear-gradient(165deg,#fdfdfe,#dde1e7);box-shadow:0 0 0 1px rgba(150,160,172,.3),var(--fc-shadow) }
+  .lobbyCard.tier-gold{ border-color:#e7b53b;background:linear-gradient(165deg,#fffdf3,#f6e6bd);box-shadow:0 0 0 1px rgba(231,181,59,.55),0 14px 48px rgba(231,181,59,.5) }
+  .lobbyCard.tier-diamond{ border-color:#4fd0e6;background:linear-gradient(165deg,#f2feff,#cbf0f8);box-shadow:0 0 0 1px rgba(79,208,230,.6),0 14px 48px rgba(79,208,230,.55) }
+  .lobbyCard.tier-netherite{ border-color:#7d5aa0;background:linear-gradient(165deg,#2b2536,#15121d);box-shadow:0 0 0 1px rgba(150,110,200,.65),0 16px 54px rgba(120,70,170,.65) }
   .lobbyCard.tier-netherite #lobbyOvr{ color:#efe6ff }
-  #lobbyHero{ position:relative;z-index:2;width:150px;height:150px;object-fit:contain;
-    filter:drop-shadow(0 12px 16px rgba(20,44,74,.34));margin-bottom:14px }
-  #lobbyHeroName{ position:absolute;z-index:4;bottom:-4px;left:50%;transform:translateX(-50%);
-    font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:15px;letter-spacing:2px;color:var(--fc-ink);
-    background:var(--fc-card);border:1px solid var(--fc-line);border-radius:20px;padding:4px 16px;
-    box-shadow:0 6px 16px rgba(20,44,74,.18);white-space:nowrap }
+  #lobbyHero{ position:relative;z-index:2;width:96%;height:auto;max-height:98%;object-fit:contain;
+    filter:drop-shadow(0 20px 26px rgba(0,0,0,.55));margin-bottom:7% }
+  #lobbyHeroName{ position:absolute;z-index:4;bottom:0;left:50%;transform:translateX(-50%);
+    font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(14px,1.8vw,18px);letter-spacing:2px;color:var(--fc-ink);
+    background:var(--fc-card);border:1px solid var(--fc-line);border-radius:20px;padding:5px 18px;
+    box-shadow:0 8px 20px rgba(0,0,0,.35);white-space:nowrap }
 
-  /* ---- INVITE SLOT (placeholder foundation for 2v2) ---- */
-  #inviteSlot{ position:relative;width:120px;height:210px;flex:0 0 auto;border-radius:18px;
-    border:2px dashed rgba(16,36,58,.22);background:rgba(16,36,58,.03);
+  /* ---- INVITE SLOT (placeholder foundation for 2v2) — beside the character, not in a box ---- */
+  #inviteSlot{ position:relative;width:min(130px,26vw);height:min(300px,40vh);flex:0 0 auto;border-radius:18px;
+    border:2px dashed rgba(255,255,255,.28);background:rgba(255,255,255,.05);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;
     transition:border-color .15s,background .15s }
-  #inviteSlot:hover{ border-color:var(--fc-accent);background:rgba(16,163,90,.06) }
-  #inviteSlot .invitePlus{ font-size:40px;color:var(--fc-ink2);line-height:1;font-weight:300 }
-  #inviteSlot .inviteLbl{ font-family:'Oswald','Arial Narrow',sans-serif;font-size:12px;letter-spacing:2px;color:var(--fc-ink2) }
+  #inviteSlot:hover{ border-color:var(--fc-accent2);background:rgba(16,163,90,.12) }
+  #inviteSlot .invitePlus{ font-size:clamp(32px,5vw,44px);color:#cfe3d6;line-height:1;font-weight:300 }
+  #inviteSlot .inviteLbl{ font-family:'Oswald','Arial Narrow',sans-serif;font-size:12px;letter-spacing:2px;color:#cfe3d6 }
   #inviteBtn{ position:absolute;bottom:12px;left:10px;right:10px;opacity:0;transform:translateY(6px);pointer-events:none;
     transition:opacity .15s,transform .15s;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;
     letter-spacing:1.5px;font-size:13px;border:none;border-radius:12px;padding:9px 0;cursor:pointer;color:#fff;
-    background:linear-gradient(180deg,var(--fc-navy),var(--fc-ink));box-shadow:0 8px 18px rgba(20,44,74,.3) }
+    background:linear-gradient(180deg,var(--fc-navy),var(--fc-ink));box-shadow:0 8px 18px rgba(0,0,0,.4) }
   #inviteSlot:hover #inviteBtn,#inviteSlot.reveal #inviteBtn{ opacity:1;transform:translateY(0);pointer-events:auto }
-  #inviteMsg{ position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);z-index:12;
+  #inviteMsg{ position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);z-index:12;
     font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;letter-spacing:1px;font-size:13px;color:#fff;
     background:linear-gradient(180deg,rgba(9,24,15,.96),rgba(5,15,9,.96));border:2px solid var(--fc-accent2);
-    border-radius:12px;padding:8px 16px;box-shadow:0 12px 30px rgba(0,0,0,.4);white-space:nowrap;
-    animation:inviteMsgIn .2s ease-out }
+    border-radius:12px;padding:8px 16px;box-shadow:0 12px 30px rgba(0,0,0,.5);white-space:nowrap;animation:inviteMsgIn .2s ease-out }
   @keyframes inviteMsgIn{ from{opacity:0;transform:translate(-50%,6px)} to{opacity:1;transform:translate(-50%,0)} }
-  @media(max-width:430px){
-    #startScreen .card{ padding:50px 12px 14px }   /* clear the top-corner account chip + bell on a phone */
+
+  /* ---- MOBILE / portrait: stack the zones, rails become tidy 2-col grids, still full-screen ---- */
+  @media(max-width:640px){
+    #lobbyRoot{ grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto auto auto;
+      grid-template-areas:"top" "stage" "railL" "railR" "play";gap:6px;padding:8px 14px 10px;
+      padding-top:max(64px,calc(env(safe-area-inset-top) + 58px)) }   /* clear the top account chip + bell */
+    #startScreen .gameTitle{ font-size:30px }
+    .lobbyRail{ display:grid;grid-template-columns:1fr 1fr;gap:7px;align-self:auto }
+    .lobbyRail .btn{ width:auto;font-size:12px;padding:10px 6px;white-space:nowrap;letter-spacing:.5px }
+    #lobbyRailL #lockerBtn{ grid-column:1 / -1 }          /* LOCKER (has the char name) gets its own full-width row */
+    #startScreen #menuBoard{ display:none }               /* leaderboard BUTTON still present; the preview panel is desktop-only */
     #lobbyStage{ gap:10px }
-    #lobbyShowcase{ width:150px;height:200px }
-    .lobbyCard{ width:122px;height:176px } #lobbyOvr{ font-size:22px }
-    #lobbyHero{ width:122px;height:122px } #lobbyHeroName{ font-size:13px;padding:3px 12px }
-    #inviteSlot{ width:90px;height:176px } #inviteSlot .invitePlus{ font-size:32px }
+    #lobbyShowcase{ width:min(220px,56vw);height:min(320px,40vh) }
+    #inviteSlot{ width:min(96px,24vw);height:min(230px,30vh) }
+    #inviteSlot .inviteLbl{ font-size:10px }
+    #startScreen #playBtn{ width:min(360px,88vw);font-size:19px;padding:14px 20px }
+    #startScreen #guestBanner{ top:max(58px,calc(env(safe-area-inset-top) + 52px)) }
   }
 </style>
 </head>
@@ -722,7 +764,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b90 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b91 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -927,13 +969,38 @@
   </div>
 
   <!-- LOBBY -->
+  <!-- b91 UI REMODEL phase 1 REBUILD: FULL-SCREEN, full-bleed Fortnite-style lobby (no floating card).
+       Zones are positioned around a swappable full-screen pitch backdrop. Every existing ID/handler kept. -->
   <div class="overlay hide" id="startScreen">
-    <div class="card">
-      <div class="gameTitle">BASED&nbsp;CUP</div>
-      <div class="sub" style="margin-bottom:6px">⚽ online soccer showdown ⚽</div>
-      <div id="liveCountMenu" style="margin-bottom:12px;font-size:13px;color:#69db7c;font-weight:bold">👁 <b>—</b> playing now</div>
+    <!-- swappable full-screen backdrop (change #lobbyBackdrop's background / add a .bg-* class to reskin) -->
+    <div id="lobbyBackdrop" data-backdrop="stadium"></div>
+    <div id="lobbyRoot">
 
-      <!-- b90 UI REMODEL phase 1: central character SHOWCASE (equipped sprite in front of their ore-tier holo card) + one INVITE slot (2v2 placeholder) -->
+      <!-- TOP-CENTRE: title + live counter -->
+      <div id="lobbyTop">
+        <div class="gameTitle">BASED&nbsp;CUP</div>
+        <div class="sub">⚽ online soccer showdown ⚽</div>
+        <div id="liveCountMenu">👁 <b>—</b> playing now</div>
+      </div>
+
+      <!-- LEFT EDGE RAIL -->
+      <div id="lobbyRailL" class="lobbyRail">
+        <button class="btn" id="lockerBtn">🎽 LOCKER — <b id="lockerBtnName">your character</b></button>
+        <button class="btn grey" id="practiceBtn">🎯 PRACTICE</button>
+        <button class="btn" id="storeBtn">🛒 STORE</button>
+      </div>
+
+      <!-- RIGHT EDGE RAIL -->
+      <div id="lobbyRailR" class="lobbyRail">
+        <button class="btn blue" id="socialBtn">👥 SOCIAL</button>
+        <button class="btn yellow" id="boardBtn">🏆 LEADERBOARD</button>
+        <div id="menuBoard" title="Open the full leaderboard">
+          <div class="dhead"><span>🏆 TOP PLAYERS</span><span class="sub">this hour ›</span></div>
+          <div id="menuBoardList"><div class="empty" style="padding:3px">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- CENTRE: equipped-character showcase (hero in front of their ore-tier card) + invite slot -->
       <div id="lobbyStage">
         <div id="lobbyShowcase" title="Your equipped character — change in the Locker">
           <div id="lobbyCard" class="lobbyCard tier-stone"><i class="lobbySheen"></i><span id="lobbyOvr">0</span></div>
@@ -947,32 +1014,24 @@
         <div id="inviteMsg" class="hide">🤝 Invite — coming with 2v2</div>
       </div>
 
-      <div id="guestBanner" class="hide" style="background:#1c3b27;border:1px solid #2f7a4a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:13px;color:#cdebd6">
+      <!-- BOTTOM-CENTRE: primary action zone — PLAY + game-mode select -->
+      <div id="lobbyPlayZone">
+        <button class="btn big-btn" id="playBtn">▶ PLAY</button>
+        <div id="lobbyModeRow">
+          <button class="lobbyMode" id="lobbyQuick">⚡ QUICK</button>
+          <button class="lobbyMode" id="lobbyWager">💰 WAGER</button>
+          <button class="lobbyMode" id="lobbyFriend">🎮 FRIEND</button>
+        </div>
+      </div>
+
+      <!-- guest banner (slim, top) -->
+      <div id="guestBanner" class="hide">
         🎁 You're playing as a guest. Add your wallet to enter the leaderboard giveaway — <b>0.1 SOL every hour</b>!
-        <div class="row" style="margin-top:8px"><button class="btn" id="guestAddWalletBtn" style="width:100%;background:#185c34">🟣 Add wallet &amp; enter giveaway</button></div>
+        <div class="row" style="margin-top:8px"><button class="btn" id="guestAddWalletBtn" style="width:100%">🟣 Add wallet &amp; enter giveaway</button></div>
       </div>
 
-      <div class="row"><button class="btn big-btn" id="playBtn">▶ PLAY</button></div>
-      <div class="muted">wager · quick match · play a friend</div>
-
-      <div class="row"><button class="btn" id="lockerBtn" style="width:100%">🎽 LOCKER — <b id="lockerBtnName">your character</b></button></div>
-      <div class="muted">equip a character — used in every match</div>
-
-      <div class="row"><button class="btn" id="storeBtn" style="width:100%">🛒 STORE</button></div>
-
-      <div id="menuBoard" title="Open the full leaderboard">
-        <div class="dhead"><span>🏆 TOP PLAYERS</span><span class="sub">this hour ›</span></div>
-        <div id="menuBoardList"><div class="empty" style="padding:3px">Loading…</div></div>
-      </div>
-
-      <div class="orline"><span>more</span></div>
-      <div class="lobbyGrid">
-        <button class="btn grey" id="practiceBtn">🎯 PRACTICE</button>
-        <button class="btn blue" id="socialBtn">👥 SOCIAL</button>
-        <button class="btn yellow" id="boardBtn">🏆 LEADERBOARD</button>
-      </div>
-
-      <div class="panel">
+      <!-- controls hint (tucked bottom-left) -->
+      <div class="panel" id="lobbyControls">
         <div class="crow"><span class="who a">MOVE</span>
           <span class="keys">
             <span class="kg"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><i>move</i></span>
@@ -3631,6 +3690,10 @@ $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedCh
   slot.addEventListener('click',e=>{ if(btn && (e.target===btn || btn.contains(e.target))) return; slot.classList.toggle('reveal'); });
   if(btn) btn.addEventListener('click',e=>{ e.stopPropagation(); showInviteMsg(); });
 })();
+// b91 UI REMODEL: bottom-centre game-mode chips reuse the EXISTING mode-hub handlers exactly (no rewire).
+(function(){ const map={lobbyQuick:'msQuickBtn', lobbyWager:'msWagerBtn', lobbyFriend:'msFriendBtn'};
+  for(const id in map){ const chip=$(id), target=$(map[id]);
+    if(chip && target) chip.onclick=()=>{ audioInit(); target.click(); }; } })();
 
 // ====== ONLINE LOBBY (play a friend, real-time, host-authoritative) ======
 let netRole=null, netKickPrev=false, stateSendAcc=0, gInputAcc=0, pingAcc=0, pingDispAcc=0, gp=null;

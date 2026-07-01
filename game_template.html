@@ -823,7 +823,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b97 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b98 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1720,8 +1720,9 @@ cv.addEventListener('mousemove',e=>{const p=toLogical(e);mouse.x=p.x;mouse.y=p.y
 cv.addEventListener('mouseenter',()=>{mouse.active=true;});
 cv.addEventListener('mouseleave',()=>{mouse.active=false;});
 cv.addEventListener('mousedown',e=>{ if(e.button===0)keys['kick']=true; else if(e.button===2){ lungeReq=true; e.preventDefault(); } });   // b85: RIGHT-CLICK = lunge (edge); left-click still kicks
+cv.addEventListener('auxclick',e=>{ if(e.button===2){ lungeReq=true; e.preventDefault(); } });   // b98: some browsers/devices don't deliver a right-button mousedown to the page — auxclick does
 addEventListener('mouseup',e=>{if(e.button===0)keys['kick']=false;});
-cv.addEventListener('contextmenu',e=>e.preventDefault());
+cv.addEventListener('contextmenu',e=>{ e.preventDefault(); if(state==='play') lungeReq=true; });   // b98: contextmenu is the canonical right-click signal (always fires) — the reliable lunge trigger; menu still suppressed
 
 // touch joystick — bind to ONE finger by its identifier so a second finger (KICK) can never
 // hijack the stick. The old code read touches[0] (the oldest finger on screen), which made the

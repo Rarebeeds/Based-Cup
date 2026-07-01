@@ -2230,6 +2230,22 @@ function renderLobbyShowcase(){
 // ===== b93: LIVING CHARACTER lobby animation — procedural, on a dedicated canvas, MENU-ONLY (self-stops
 //       when the lobby isn't visible so it never runs during a match / burns battery). Light + efficient. =====
 const LA_MOVES=['keepups','dribble','jog','celebrate'];
+// b94 tunables
+const LOBBY_EASE=0.10;          // head pose ease/frame — LOWER = smoother, slower move-to-move transitions
+const LOBBY_ROAM_EASE=0.045;    // how briskly he runs to a new roam spot (lower = more leisurely)
+const LOBBY_BALL_GRAV=2.7;      // ball gravity (normalized units/s^2) — HIGHER = deeper up/down arc
+const LOBBY_BALL_BOUNCE=1.30;   // upward speed off a keepup header — HIGHER = higher juggle
+// LOBBY-ONLY face crop: a FEATHERED ELLIPSE head-mask (× the head radius R) — keeps skin/face/hair/facial-hair
+// + small accessories (Elon's wires), clips the shoulders/shirt, and its soft rim means no hard/choppy cut.
+// Robust across the 14 face-width-normalised sprites (suit chars flare wide at the jaw). Per-char overrides
+// below where a head needs it. Does NOT touch the real in-match sprite files or the grab radius / hitbox.
+const LOBBY_HEAD_DEF={ rx:1.55, ry:1.70, cy:-0.18 };
+const LOBBY_HEAD={
+  // taller/wider or lower-set heads get bespoke ellipses so none clip hair or leave shoulders
+  boomer:{rx:1.55,ry:1.66,cy:-0.20}, elon:{rx:1.5,ry:1.58,cy:-0.24}, obampe:{rx:1.5,ry:1.58,cy:-0.24},
+  pdidpe:{rx:1.5,ry:1.56,cy:-0.25}, grandpa:{rx:1.55,ry:1.62,cy:-0.22}, oldwoj:{rx:1.6,ry:1.66,cy:-0.20},
+  trumpe:{rx:1.6,ry:1.7,cy:-0.18}, pepe:{rx:1.66,ry:1.72,cy:-0.16}
+};
 let _laReq=0, _laLast=0, _la=null;
 function lobbyAnimSetChar(c){ if(_la){ _la.char=c; _la.img=imgFor(c); } }
 function lobbyAnimResize(){ const cv=document.getElementById('lobbyCharCv'); if(!cv||!cv.getBoundingClientRect) return;
@@ -2237,11 +2253,20 @@ function lobbyAnimResize(){ const cv=document.getElementById('lobbyCharCv'); if(
   const w=Math.max(1,Math.round((r.width||260)*dpr)), h=Math.max(1,Math.round((r.height||180)*dpr));
   if(cv.width!==w) cv.width=w; if(cv.height!==h) cv.height=h; }
 function lobbyPickMove(){ let m; do{ m=LA_MOVES[Math.floor(Math.random()*LA_MOVES.length)]; }while(m===_la.move);
-  _la.move=m; _la.t=0; _la.dur=({jog:2.4,dribble:3.2,keepups:4.4,celebrate:2.4})[m]||2.6; }
+  _la.move=m; _la.t=0; _la.dur=({jog:2.6,dribble:3.4,keepups:4.6,celebrate:2.4})[m]||2.8; lobbyOnMoveStart(); }
+function lobbyOnMoveStart(){   // b94: pick a roam target + (re)seat the ball for the new move
+  const M=_la.move;
+  _la.roamX=(M==='jog'||M==='dribble') ? (0.16+Math.random()*0.68) : _la.hx;   // run to a new spot, or juggle/celebrate in place
+  if(M==='keepups'){ _la.bx=_la.hx; _la.by=_la.hy-0.30; _la.bvy=0; _la.bshow=true; }
+  else if(M==='dribble'){ _la.bx=_la.hx+_la.face*0.05; _la.by=0.90; _la.bvy=-0.55; _la.bshow=true; }
+  else { _la.bshow=false; }
+  _la.hHit=0;
+}
 function lobbyAnimStart(){
   const cv=document.getElementById('lobbyCharCv'); if(!cv) return;
-  if(!_la) _la={ move:'jog', t:0, dur:2.4, char:equippedChar, img:imgFor(equippedChar),
-    hx:0.5, hy:0.46, hrot:0, face:1, bx:0.5, by:0.8, bshow:false, sized:false };
+  if(!_la){ _la={ move:'jog', t:0, dur:2.6, char:equippedChar, img:imgFor(equippedChar),
+    hx:0.5, hy:0.5, hrot:0, face:1, bx:0.5, by:0.9, bvy:0, bshow:false, roamX:0.5, hHit:0, sized:false };
+    lobbyOnMoveStart(); }
   _la.sized=false; lobbyAnimResize();
   if(_laReq) return;   // already looping
   _laLast=(typeof performance!=='undefined'&&performance.now)?performance.now():0;
@@ -2258,40 +2283,51 @@ function lobbyFrame(now){
 }
 function lobbyAnimStep(dt){
   _la.t+=dt; if(_la.t>=_la.dur) lobbyPickMove();
-  const tt=_la.t, cx=0.5, headY=0.46, groundY=0.86, M=_la.move;
-  let thx=cx, thy=headY, throt=0, tface=1, tbx=cx, tby=groundY-0.05, tbshow=false;
-  if(M==='jog'){
-    thy=headY - Math.abs(Math.sin(tt*7))*0.05; throt=Math.sin(tt*7)*0.05;
-  } else if(M==='dribble'){
-    thx=cx + Math.sin(tt*2.3)*0.20; thy=headY - Math.abs(Math.sin(tt*4.6))*0.03; throt=-Math.cos(tt*2.3)*0.13;
-    tface=Math.cos(tt*2.3)>=0?1:-1;
-    tbshow=true; tbx=cx + Math.sin(tt*2.3+0.5)*0.24; tby=groundY - Math.abs(Math.sin(tt*4.6))*0.05;
-  } else if(M==='keepups'){
+  const tt=_la.t, M=_la.move, ground=0.90, headY=0.50, prevX=_la.hx;
+  let thy=headY, throt=0, xoff=0, tbshow=_la.bshow;
+  if(M==='jog'){                                          // jog on the spot while running to a new spot
+    thy=headY - Math.abs(Math.sin(tt*7))*0.045; throt=Math.sin(tt*7)*0.05;
+  } else if(M==='dribble'){                               // dribble the ball across (real low bounce, tracks his feet)
+    thy=headY - Math.abs(Math.sin(tt*5))*0.022; throt=-Math.cos(tt*4)*0.08;
+    _la.bvy+=LOBBY_BALL_GRAV*dt; _la.by+=_la.bvy*dt;
+    const footX=_la.hx + _la.face*0.05; _la.bx += (footX-_la.bx)*0.16;
+    if(_la.by>=ground && _la.bvy>0){ _la.by=ground; _la.bvy=-LOBBY_BALL_BOUNCE*0.5; }
     tbshow=true;
-    if(tt <= _la.dur-1.1){                              // juggling
-      const bnc=Math.abs(Math.sin(tt*2.7));
-      tby=headY - 0.10 - bnc*0.30; tbx=cx + Math.sin(tt*1.3)*0.03;
-      thy=headY - Math.max(0,Math.sin(tt*2.7))*0.035; throt=Math.sin(tt*2.7)*0.05;
-    } else {                                            // finish on a BACKFLIP + landing
-      const fp=(tt-(_la.dur-1.1))/1.1;                  // 0..1
-      throt=fp*Math.PI*2; thy=headY - Math.sin(fp*Math.PI)*0.22; thx=cx - Math.sin(fp*Math.PI)*0.05;
-      tby=headY - 0.26 + fp*0.34; tbx=cx+0.05;
+  } else if(M==='keepups'){                              // juggle with a proper gravity arc, finish on a BACKFLIP
+    if(tt <= _la.dur-1.25){
+      _la.bvy+=LOBBY_BALL_GRAV*dt; _la.by+=_la.bvy*dt; _la.bx += (_la.hx-_la.bx)*0.05;
+      const headTop=_la.hy-0.14;
+      if(_la.by>=headTop && _la.bvy>0){ _la.by=headTop; _la.bvy=-LOBBY_BALL_BOUNCE; _la.hHit=0.09; }   // header bounce
+      throt=Math.sin(tt*3)*0.04; thy=headY; tbshow=true;
+    } else {
+      const fp=(tt-(_la.dur-1.25))/1.25;                 // 0..1 backflip + landing
+      throt=fp*Math.PI*2; thy=headY - Math.sin(fp*Math.PI)*0.20; xoff=-Math.sin(fp*Math.PI)*0.05;
+      _la.bvy+=LOBBY_BALL_GRAV*dt; _la.by+=_la.bvy*dt; tbshow=true;
     }
-  } else if(M==='celebrate'){
-    const hop=Math.abs(Math.sin(tt*3.4));
-    thy=headY - hop*0.11; throt=Math.sin(tt*7)*0.16; thx=cx + Math.sin(tt*3.4)*0.03;
+  } else if(M==='celebrate'){                            // little jump + wiggle
+    const hop=Math.abs(Math.sin(tt*3.2)); thy=headY - hop*0.10; throt=Math.sin(tt*6.5)*0.15; tbshow=false;
   }
-  const k=0.18;   // ease actual->target => SMOOTH transitions between moves
-  _la.hx+=(thx-_la.hx)*k; _la.hy+=(thy-_la.hy)*k; _la.bx+=(tbx-_la.bx)*k; _la.by+=(tby-_la.by)*k;
-  _la.hrot=throt;                                        // rotation is continuous (moves end near 0 / 2π) — no jump
-  _la.face=(M==='dribble')?tface:1;
-  _la.bshow=tbshow;
+  if(_la.hHit>0){ thy-=_la.hHit; _la.hHit*=0.85; if(_la.hHit<0.002)_la.hHit=0; }   // head hop on a header
+  if(_la.by<0.04){ _la.by=0.04; if(_la.bvy<0)_la.bvy=0; }                          // don't let the ball fly off the top
+  // SLOW, smooth blends: ease head vertical toward its target; run horizontally toward the roam spot
+  _la.hy += (thy-_la.hy)*LOBBY_EASE;
+  _la.hx += ((_la.roamX+xoff)-_la.hx)*LOBBY_ROAM_EASE;
+  _la.hrot=throt; _la.bshow=tbshow;
+  const vx=_la.hx-prevX;                                  // face the way he's running (dribble/jog); forward otherwise
+  if((M==='dribble'||M==='jog') && Math.abs(vx)>0.0006) _la.face = vx>0?1:-1; else if(M!=='dribble'&&M!=='jog') _la.face=1;
 }
-function laDrawHead(c2,img,x,y,rot,face,R){
+function laDrawHead(c2,img,x,y,rot,face,R,cfg){
   if(!(img&&img.complete&&img.naturalWidth)) return;
   const iw=img.naturalWidth, ih=img.naturalHeight, s=(R*FACE_FIT)/(iw*FACE_RF);
-  c2.save(); c2.translate(x,y); c2.rotate(rot); if(face<0)c2.scale(-1,1);
-  c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s); c2.restore();
+  const rx=(cfg.rx||1.55)*R, ry=(cfg.ry||1.7)*R, cy=(cfg.cy||-0.18)*R;   // b94 LOBBY-ONLY feathered ELLIPSE mask around the face
+  c2.save(); c2.translate(x,y); c2.rotate(rot);
+  c2.save(); c2.beginPath(); c2.ellipse(0,cy,rx,ry,0,0,7); c2.clip();    // keep head (face+hair+accessories), clip the shoulders/shirt
+  c2.save(); if(face<0)c2.scale(-1,1); c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s); c2.restore();
+  // feather the rim so the crop fades softly (no hard/choppy cut) — radial gradient scaled to the ellipse
+  c2.translate(0,cy); c2.scale(rx,ry);
+  const g=c2.createRadialGradient(0,0,0.80,0,0,1.0); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,1)');
+  c2.globalCompositeOperation='destination-out'; c2.fillStyle=g; c2.beginPath(); c2.arc(0,0,1,0,7); c2.fill();
+  c2.restore(); c2.restore();
 }
 function laDrawBall(c2,x,y,r){
   c2.save(); c2.beginPath(); c2.arc(x,y,r,0,7); c2.fillStyle='#fff'; c2.fill();
@@ -2301,13 +2337,13 @@ function laDrawBall(c2,x,y,r){
 function lobbyAnimDraw(cv){
   const c2=cv.getContext&&cv.getContext('2d'); if(!c2) return;
   const W2=cv.width, H2=cv.height; c2.clearRect(0,0,W2,H2);
-  const hx=_la.hx*W2, hy=_la.hy*H2, R=H2*0.30, groundY=0.86*H2;
-  const lift=Math.max(0,0.46-_la.hy);                   // how high the head is above rest
-  const sa=0.30*(1-lift*1.7), sw=R*1.05*(1-lift*1.1);
+  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.34, W2*0.20), groundY=0.90*H2;   // big head, sized to fit the roam strip
+  const lift=Math.max(0,0.50-_la.hy);                   // how high above the ground rest
+  const sa=0.28*(1-lift*1.5), sw=R*1.0*(1-lift*0.9);
   if(sa>0.02){ c2.save(); c2.globalAlpha=sa; c2.fillStyle='#000';
-    c2.beginPath(); c2.ellipse(hx, groundY+R*0.16, Math.max(4,sw), Math.max(2,R*0.22), 0,0,7); c2.fill(); c2.restore(); }
-  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R);
-  if(_la.bshow) laDrawBall(c2, _la.bx*W2, _la.by*H2, R*0.34);
+    c2.beginPath(); c2.ellipse(hx, groundY+R*0.06, Math.max(4,sw), Math.max(2,R*0.18), 0,0,7); c2.fill(); c2.restore(); }
+  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R,(LOBBY_HEAD[_la.char]||LOBBY_HEAD_DEF));
+  if(_la.bshow) laDrawBall(c2, _la.bx*W2, _la.by*H2, R*0.32);
 }
 let _inviteMsgT=null;
 function showInviteMsg(){ const m=document.getElementById('inviteMsg'); if(!m) return;

@@ -2148,8 +2148,21 @@ function cancelMatch(){ quickMode=false; clearInterval(matchTimer); clearTimeout
   netRole=null;
   $('matchScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); }
 // ---- PLAY hub: one entry point, three distinct modes (no overlap) ----
-function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.remove('hide'); }
-$('playBtn').onclick=openModeSelect;
+function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.remove('hide'); }   // b101: kept in the DOM (hidden) so the ms*Btn launch logic + IDs survive; PLAY now dispatches directly
+// b101: lobby bottom = TYPE selector (Quick/Wager/Friend) + MODE selector (Goals/Keep-Away) + one PLAY.
+// Restores keep-away for ALL flows (fixes the b70/b87 orphaning where quick/wager/practice hard-coded goals).
+let lobbyType='quick';
+function updateLobbyModeHint(){ if($('lobbyModeHint')) $('lobbyModeHint').textContent =
+  gameMode==='keepaway' ? 'Hold the ball longest — one 1:30 round, no half-time.' : 'First to most goals over two halves.'; }
+function syncLobbyMode(){ document.querySelectorAll('#lobbyModeSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-mode')===gameMode)); updateLobbyModeHint(); }
+seg('lobbyTypeSeg','data-type', t=>{ lobbyType=t; });
+seg('lobbyModeSeg','data-mode', m=>{ gameMode=m; updateLobbyModeHint(); });   // seg() already sets gameMode; keep-away then reaches newGame()/matchLen()
+$('playBtn').onclick=()=>{ audioInit();
+  if(lobbyType==='wager') $('msWagerBtn').click();          // → onlineWagerEnabled check → openWagerSelect (stake) → queue
+  else if(lobbyType==='friend') $('msFriendBtn').click();   // → openOnlineLobby (private lobby)
+  else $('msQuickBtn').click();                             // → startQuickMatch (respects the selected gameMode now)
+};
+syncLobbyMode();
 $('msBackBtn').onclick=()=>{ $('modeSelectScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
 $('msWagerBtn').onclick=()=>{                       // wager mode: pick a stake first, then character
   if(!onlineWagerEnabled()){ showToast('Sign in with an account to wager $BASED','#ffd43b'); return; }
@@ -2166,8 +2179,8 @@ document.querySelectorAll('#wagerSelectScreen .wsAmt').forEach(b=>{
     if(amt>myCoins()){ $('wsErr').innerHTML='Not enough $BASED — you have '+coinIcon()+myCoins()+'.'; return; }
     stakeSel=amt;                                    // stake locked in
     $('wagerSelectScreen').classList.add('hide');
-    loadEquipped(); humanChar=equippedChar; gameMode='goals'; csContext='wager'; startQuickMatch(); }; });   // BUILD 1: equipped char, queue straight in
-$('msQuickBtn').onclick=()=>{ stakeSel=0; loadEquipped(); humanChar=equippedChar; gameMode='goals'; csContext='quick'; startQuickMatch(); };   // BUILD 1: equipped char, no picker
+    loadEquipped(); humanChar=equippedChar; csContext='wager'; startQuickMatch(); }; });   // BUILD 1: equipped char, queue straight in — b101: respects the lobby-selected gameMode (was hard-coded goals)
+$('msQuickBtn').onclick=()=>{ stakeSel=0; loadEquipped(); humanChar=equippedChar; csContext='quick'; startQuickMatch(); };   // BUILD 1: equipped char, no picker — b101: respects the lobby-selected gameMode (was hard-coded goals)
 $('msFriendBtn').onclick=()=>openOnlineLobby();    // private friend lobby (no wager)
 
 // ---- STORE (currency top-ups — placeholder, no marketplace yet) ----
@@ -2566,17 +2579,16 @@ $('selStartBtn').onclick=()=>{
 // FIX 1 (b87): Practice launches STRAIGHT IN with the equipped character (like quick/wager/friend) —
 // no character/opponent select screen. Defaults to vs-CPU at the current difficulty.
 $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
-  gameMode='goals'; ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };
+  ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };   // b101: respects the lobby-selected gameMode (was hard-coded goals)
 // b90 UI REMODEL: invite slot (2v2 placeholder). Hover (desktop) reveals INVITE via CSS; tap (mobile) toggles it;
 // clicking INVITE shows a clean styled "coming with 2v2" message — no real party functionality yet.
 (function(){ const slot=$('inviteSlot'), btn=$('inviteBtn'); if(!slot) return;
   slot.addEventListener('click',e=>{ if(btn && (e.target===btn || btn.contains(e.target))) return; slot.classList.toggle('reveal'); });
   if(btn) btn.addEventListener('click',e=>{ e.stopPropagation(); showInviteMsg(); });
 })();
-// b91 UI REMODEL: bottom-centre game-mode chips reuse the EXISTING mode-hub handlers exactly (no rewire).
-(function(){ const map={lobbyQuick:'msQuickBtn', lobbyWager:'msWagerBtn', lobbyFriend:'msFriendBtn'};
-  for(const id in map){ const chip=$(id), target=$(map[id]);
-    if(chip && target) chip.onclick=()=>{ audioInit(); target.click(); }; } })();
+// b101: the old lobby chips (lobbyQuick/Wager/Friend) are now TYPE SELECTORS wired via seg('lobbyTypeSeg')
+// earlier — PLAY dispatches by the selected type. The b91 chip→ms*Btn .click() map is removed so it can't
+// override the selector's onclick (last-writer-wins would have made the chips launch instead of select).
 // b93: tap the stats banner to FLIP front(mechanics)<->back(your record). Display-only — cannot change character.
 (function(){ const card=$('lobbyCard'); if(card) card.addEventListener('click',()=>card.classList.toggle('flip')); })();
 // keep the living-character canvas fitted to its box on resize/orientation change (only matters on the lobby)
@@ -3638,6 +3650,7 @@ function gotoMenu(){
   $('startScreen').classList.remove('hide');
   const pt=$('pingTag'); if(pt)pt.classList.add('hide'); NET.rtt=null;
   refreshAcctBtn(); renderDaily(); syncRegionUI(); setMenuDocks(true); renderMenuTop3(); startMusic('lobby');
+  if(typeof syncLobbyMode==='function') syncLobbyMode();   // b101: reflect the current gameMode in the lobby MODE selector (e.g. after a friend-host match)
 }
 $('pauseBtn').onclick=togglePause;
 $('muteBtn').onclick=toggleMute;

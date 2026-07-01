@@ -689,6 +689,16 @@
     transition:background .15s,border-color .15s,transform .06s }
   .lobbyMode:hover{ background:rgba(255,255,255,.2);border-color:var(--fc-accent2) }
   .lobbyMode:active{ transform:translateY(1px) }
+  /* b101: lobby bottom = TYPE + MODE selectors (reuse .seg), then one PLAY */
+  .lobbySelectors{ display:flex;gap:16px;justify-content:center;align-items:flex-end;flex-wrap:wrap }
+  .lobbySelBlock{ display:flex;flex-direction:column;align-items:center;gap:5px }
+  .lobbySelLbl{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:10px;letter-spacing:2px;color:rgba(234,250,240,.72) }
+  .seg.lobbySeg{ border-color:rgba(255,255,255,.24);background:rgba(255,255,255,.07) }
+  .seg.lobbySeg button{ background:transparent;color:#eafaf0;font-family:'Oswald','Arial Narrow',sans-serif;font-size:12.5px;letter-spacing:1px;padding:9px 15px;transition:background .15s }
+  .seg.lobbySeg button:hover{ background:rgba(255,255,255,.13) }
+  .seg.lobbySeg button.on{ background:#51cf66;color:#06140b }
+  .seg.lobbySeg button.on:hover{ background:#5ed873 }
+  .lobbyModeHint{ font-family:'Oswald','Arial Narrow',sans-serif;font-size:11px;letter-spacing:.4px;color:rgba(234,250,240,.62);text-align:center;margin-top:1px }
 
   /* guest banner (slim top overlay) + controls hint (bottom-left overlay) */
   /* b96: bottom-left, FIFA-clean card (was a centred top banner) */
@@ -806,6 +816,9 @@
     .lbStats{ gap:2px 8px } .lbStat{ font-size:9px } .lbStat .lbSL{ width:30px }
     #lobbyCharBox{ width:100%;aspect-ratio:11/7 }        /* full-width roam pitch on a phone */
     #startScreen #playBtn{ width:min(360px,88vw);font-size:19px;padding:14px 20px }
+    .lobbySelectors{ gap:10px }
+    .seg.lobbySeg button{ font-size:11px;padding:8px 11px;letter-spacing:.5px }
+    .lobbySelLbl{ font-size:9px }
     #startScreen #guestBanner{ left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:min(250px,72vw);font-size:11px }
   }
 </style>
@@ -823,7 +836,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b100 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b101 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1097,14 +1110,28 @@
         </div>
       </div>
 
-      <!-- BOTTOM-CENTRE: primary action zone — PLAY + game-mode select -->
+      <!-- BOTTOM-CENTRE: primary action zone — pick a TYPE + a MODE (selectors), then one PLAY.
+           b101: restores the Goals/Keep-Away select for ALL flows (was orphaned in #selectScreen since b70/b87). -->
       <div id="lobbyPlayZone">
-        <button class="btn big-btn" id="playBtn">▶ PLAY</button>
-        <div id="lobbyModeRow">
-          <button class="lobbyMode" id="lobbyQuick">⚡ QUICK</button>
-          <button class="lobbyMode" id="lobbyWager">💰 WAGER</button>
-          <button class="lobbyMode" id="lobbyFriend">🎮 FRIEND</button>
+        <div class="lobbySelectors">
+          <div class="lobbySelBlock">
+            <div class="lobbySelLbl">MATCH</div>
+            <div class="seg lobbySeg" id="lobbyTypeSeg">
+              <button data-type="quick" class="on" id="lobbyQuick">⚡ QUICK</button>
+              <button data-type="wager" id="lobbyWager">💰 WAGER</button>
+              <button data-type="friend" id="lobbyFriend">🎮 FRIEND</button>
+            </div>
+          </div>
+          <div class="lobbySelBlock">
+            <div class="lobbySelLbl">MODE</div>
+            <div class="seg lobbySeg" id="lobbyModeSeg">
+              <button data-mode="goals" class="on">⚽ GOALS</button>
+              <button data-mode="keepaway">⏱️ KEEP-AWAY</button>
+            </div>
+          </div>
         </div>
+        <div class="lobbyModeHint" id="lobbyModeHint">First to most goals over two halves.</div>
+        <button class="btn big-btn" id="playBtn">▶ PLAY</button>
       </div>
 
       <!-- guest banner (slim, top) -->
@@ -3515,8 +3542,21 @@ function cancelMatch(){ quickMode=false; clearInterval(matchTimer); clearTimeout
   netRole=null;
   $('matchScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); setMenuDocks(true); }
 // ---- PLAY hub: one entry point, three distinct modes (no overlap) ----
-function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.remove('hide'); }
-$('playBtn').onclick=openModeSelect;
+function openModeSelect(){ hideAllOverlays(); $('modeSelectScreen').classList.remove('hide'); }   // b101: kept in the DOM (hidden) so the ms*Btn launch logic + IDs survive; PLAY now dispatches directly
+// b101: lobby bottom = TYPE selector (Quick/Wager/Friend) + MODE selector (Goals/Keep-Away) + one PLAY.
+// Restores keep-away for ALL flows (fixes the b70/b87 orphaning where quick/wager/practice hard-coded goals).
+let lobbyType='quick';
+function updateLobbyModeHint(){ if($('lobbyModeHint')) $('lobbyModeHint').textContent =
+  gameMode==='keepaway' ? 'Hold the ball longest — one 1:30 round, no half-time.' : 'First to most goals over two halves.'; }
+function syncLobbyMode(){ document.querySelectorAll('#lobbyModeSeg button').forEach(b=>b.classList.toggle('on', b.getAttribute('data-mode')===gameMode)); updateLobbyModeHint(); }
+seg('lobbyTypeSeg','data-type', t=>{ lobbyType=t; });
+seg('lobbyModeSeg','data-mode', m=>{ gameMode=m; updateLobbyModeHint(); });   // seg() already sets gameMode; keep-away then reaches newGame()/matchLen()
+$('playBtn').onclick=()=>{ audioInit();
+  if(lobbyType==='wager') $('msWagerBtn').click();          // → onlineWagerEnabled check → openWagerSelect (stake) → queue
+  else if(lobbyType==='friend') $('msFriendBtn').click();   // → openOnlineLobby (private lobby)
+  else $('msQuickBtn').click();                             // → startQuickMatch (respects the selected gameMode now)
+};
+syncLobbyMode();
 $('msBackBtn').onclick=()=>{ $('modeSelectScreen').classList.add('hide'); $('startScreen').classList.remove('hide'); };
 $('msWagerBtn').onclick=()=>{                       // wager mode: pick a stake first, then character
   if(!onlineWagerEnabled()){ showToast('Sign in with an account to wager $BASED','#ffd43b'); return; }
@@ -3533,8 +3573,8 @@ document.querySelectorAll('#wagerSelectScreen .wsAmt').forEach(b=>{
     if(amt>myCoins()){ $('wsErr').innerHTML='Not enough $BASED — you have '+coinIcon()+myCoins()+'.'; return; }
     stakeSel=amt;                                    // stake locked in
     $('wagerSelectScreen').classList.add('hide');
-    loadEquipped(); humanChar=equippedChar; gameMode='goals'; csContext='wager'; startQuickMatch(); }; });   // BUILD 1: equipped char, queue straight in
-$('msQuickBtn').onclick=()=>{ stakeSel=0; loadEquipped(); humanChar=equippedChar; gameMode='goals'; csContext='quick'; startQuickMatch(); };   // BUILD 1: equipped char, no picker
+    loadEquipped(); humanChar=equippedChar; csContext='wager'; startQuickMatch(); }; });   // BUILD 1: equipped char, queue straight in — b101: respects the lobby-selected gameMode (was hard-coded goals)
+$('msQuickBtn').onclick=()=>{ stakeSel=0; loadEquipped(); humanChar=equippedChar; csContext='quick'; startQuickMatch(); };   // BUILD 1: equipped char, no picker — b101: respects the lobby-selected gameMode (was hard-coded goals)
 $('msFriendBtn').onclick=()=>openOnlineLobby();    // private friend lobby (no wager)
 
 // ---- STORE (currency top-ups — placeholder, no marketplace yet) ----
@@ -3933,17 +3973,16 @@ $('selStartBtn').onclick=()=>{
 // FIX 1 (b87): Practice launches STRAIGHT IN with the equipped character (like quick/wager/friend) —
 // no character/opponent select screen. Defaults to vs-CPU at the current difficulty.
 $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
-  gameMode='goals'; ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };
+  ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };   // b101: respects the lobby-selected gameMode (was hard-coded goals)
 // b90 UI REMODEL: invite slot (2v2 placeholder). Hover (desktop) reveals INVITE via CSS; tap (mobile) toggles it;
 // clicking INVITE shows a clean styled "coming with 2v2" message — no real party functionality yet.
 (function(){ const slot=$('inviteSlot'), btn=$('inviteBtn'); if(!slot) return;
   slot.addEventListener('click',e=>{ if(btn && (e.target===btn || btn.contains(e.target))) return; slot.classList.toggle('reveal'); });
   if(btn) btn.addEventListener('click',e=>{ e.stopPropagation(); showInviteMsg(); });
 })();
-// b91 UI REMODEL: bottom-centre game-mode chips reuse the EXISTING mode-hub handlers exactly (no rewire).
-(function(){ const map={lobbyQuick:'msQuickBtn', lobbyWager:'msWagerBtn', lobbyFriend:'msFriendBtn'};
-  for(const id in map){ const chip=$(id), target=$(map[id]);
-    if(chip && target) chip.onclick=()=>{ audioInit(); target.click(); }; } })();
+// b101: the old lobby chips (lobbyQuick/Wager/Friend) are now TYPE SELECTORS wired via seg('lobbyTypeSeg')
+// earlier — PLAY dispatches by the selected type. The b91 chip→ms*Btn .click() map is removed so it can't
+// override the selector's onclick (last-writer-wins would have made the chips launch instead of select).
 // b93: tap the stats banner to FLIP front(mechanics)<->back(your record). Display-only — cannot change character.
 (function(){ const card=$('lobbyCard'); if(card) card.addEventListener('click',()=>card.classList.toggle('flip')); })();
 // keep the living-character canvas fitted to its box on resize/orientation change (only matters on the lobby)
@@ -5005,6 +5044,7 @@ function gotoMenu(){
   $('startScreen').classList.remove('hide');
   const pt=$('pingTag'); if(pt)pt.classList.add('hide'); NET.rtt=null;
   refreshAcctBtn(); renderDaily(); syncRegionUI(); setMenuDocks(true); renderMenuTop3(); startMusic('lobby');
+  if(typeof syncLobbyMode==='function') syncLobbyMode();   // b101: reflect the current gameMode in the lobby MODE selector (e.g. after a friend-host match)
 }
 $('pauseBtn').onclick=togglePause;
 $('muteBtn').onclick=toggleMute;

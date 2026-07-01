@@ -324,6 +324,11 @@
     background:rgba(120,170,255,.92);border:none;color:#04122a;font-weight:bold;font-size:14px;
     letter-spacing:1px;pointer-events:auto;touch-action:none;box-shadow:0 5px 0 #2f5fb0}
   #lungeBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #2f5fb0}
+  /* b95: dedicated SPRINT button — HELD to sprint. Placed LEFT of LUNGE (right thumb), clear of KICK/LUNGE. */
+  #sprintBtn{position:absolute;right:calc(max(22px,env(safe-area-inset-right)) + 232px);bottom:34px;width:84px;height:84px;border-radius:50%;
+    background:rgba(255,212,59,.92);border:none;color:#3a2c00;font-weight:bold;font-size:14px;
+    letter-spacing:.5px;pointer-events:auto;touch-action:none;box-shadow:0 5px 0 #b8860b}
+  #sprintBtn:active{transform:translateY(3px);box-shadow:0 2px 0 #b8860b;background:rgba(255,224,110,.98)}
   /* "rotate your phone" nudge — Based Cup plays in landscape */
   #rotateHint{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;padding:30px;
@@ -348,6 +353,7 @@
     #joy{width:122px;height:122px} #stick{width:54px;height:54px}
     #kickBtn{width:98px;height:98px;font-size:15px}
     #lungeBtn{width:72px;height:72px;font-size:12px;right:calc(max(22px,env(safe-area-inset-right)) + 102px);bottom:46px}
+    #sprintBtn{width:70px;height:70px;font-size:12px;right:calc(max(22px,env(safe-area-inset-right)) + 190px);bottom:34px}
   }
   /* b85: yellow/red card flash overlay + per-player card mark on the HUD card */
   #cardFlash{position:fixed;inset:0;z-index:340;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -809,7 +815,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b94 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b95 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -854,6 +860,7 @@
 
   <div id="touch">
     <div id="joy"><div id="stick"></div></div>
+    <button id="sprintBtn">⚡RUN</button>
     <button id="lungeBtn">LUNGE</button>
     <button id="kickBtn">KICK</button>
   </div>
@@ -1508,6 +1515,10 @@ function statDerived(c){ const s=STATS[c], sp=speedSplit(c); return {
 const imgFor=c=> IMG[c]||imgP;
 const BALL_R=13;
 const SPRINT_MULT=1.55;
+// b95 touch movement tuning: map joystick TILT -> movement input so a normal push = FULL normal speed
+// (fixes the "walking in concrete" feel), and NOT tied to sprint (sprint is now a dedicated button).
+const TOUCH_MOVE_DEADZONE=0.16;   // ignore tiny stick jitter below this tilt fraction
+const TOUCH_MOVE_FULLTILT=0.60;   // at/above this tilt the joystick delivers FULL input (magnitude 1) = same as a full keyboard press
 // ---- Stat-model tuning (Phase 2, b55) — easily tweakable. grabCap is NOT here (stays constant 48). ----
 const STEAL_BASE=0.30;        // per-contest steal chance when defender.defense == carrier.dribble (even match)
 const STEAL_WEIGHT=0.035;     // +/- chance per point of (defender.def - carrier.drb); halved for the /20 stat scale (b74)
@@ -1704,16 +1715,21 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 let joyVec={x:0,y:0}, joyActive=false, touchKick=false, touchSprint=false, joyId=null;
 const joy=document.getElementById('joy'), stick=document.getElementById('stick');
 function joyXY(t){const r=joy.getBoundingClientRect();
-  let dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2);
+  const dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2);
   const mag=Math.hypot(dx,dy), max=r.width/2;
-  if(mag>max){dx=dx/mag*max; dy=dy/mag*max;}
-  stick.style.left=(50+dx/max*40)+'%'; stick.style.top=(50+dy/max*40)+'%';
-  joyVec={x:dx/max,y:dy/max};
-  touchSprint = (mag/max) > 0.9;}      // shove the stick to the rim to sprint (no extra button)
+  // stick visual follows the finger (clamped to the rim)
+  let vdx=dx, vdy=dy; if(mag>max){vdx=dx/mag*max; vdy=dy/mag*max;}
+  stick.style.left=(50+vdx/max*40)+'%'; stick.style.top=(50+vdy/max*40)+'%';
+  // b95: OUTPUT = unit direction * gained magnitude — a moderate push already gives FULL normal speed
+  // (no "concrete"), and the joystick NO LONGER triggers sprint (that's a dedicated button now).
+  const raw=Math.min(1, mag/max);
+  const out = raw<=TOUCH_MOVE_DEADZONE ? 0 : Math.min(1,(raw-TOUCH_MOVE_DEADZONE)/(TOUCH_MOVE_FULLTILT-TOUCH_MOVE_DEADZONE));
+  const ux = mag>0?dx/mag:0, uy = mag>0?dy/mag:0;
+  joyVec={x:ux*out, y:uy*out};}
 function joyFinger(e){ for(const t of e.changedTouches){ if(t.identifier===joyId) return t; } return null; }
 joy.addEventListener('touchstart',e=>{const t=e.changedTouches[0]; joyId=t.identifier; joyActive=true; joyXY(t); e.preventDefault();},{passive:false});
 joy.addEventListener('touchmove',e=>{const t=joyFinger(e); if(t) joyXY(t); e.preventDefault();},{passive:false});
-function joyRelease(e){ if(joyFinger(e)){ joyActive=false; touchSprint=false; joyVec={x:0,y:0}; joyId=null; stick.style.left='50%'; stick.style.top='50%'; } e.preventDefault(); }
+function joyRelease(e){ if(joyFinger(e)){ joyActive=false; joyVec={x:0,y:0}; joyId=null; stick.style.left='50%'; stick.style.top='50%'; } e.preventDefault(); }   // b95: sprint is no longer tied to the joystick (dedicated button)
 joy.addEventListener('touchend',joyRelease,{passive:false});
 joy.addEventListener('touchcancel',joyRelease,{passive:false});
 const kickBtn=document.getElementById('kickBtn');
@@ -1723,6 +1739,11 @@ kickBtn.addEventListener('touchcancel',e=>{touchKick=false;e.preventDefault()},{
 // b85: dedicated mobile LUNGE button — distinct from KICK; sets the same edge-triggered request
 const lungeBtn=document.getElementById('lungeBtn');
 if(lungeBtn){ lungeBtn.addEventListener('touchstart',e=>{ lungeReq=true; e.preventDefault(); },{passive:false}); }
+// b95: dedicated mobile SPRINT button — HOLD to sprint (replaces the accidental rim-of-joystick trigger). Costs stamina as before.
+const sprintBtn=document.getElementById('sprintBtn');
+if(sprintBtn){ sprintBtn.addEventListener('touchstart',e=>{touchSprint=true;e.preventDefault()},{passive:false});
+  sprintBtn.addEventListener('touchend',e=>{touchSprint=false;e.preventDefault()},{passive:false});
+  sprintBtn.addEventListener('touchcancel',e=>{touchSprint=false;e.preventDefault()},{passive:false}); }
 
 // ---- Audio (all synthesized — no external files) ----
 let actx=null, master=null, NOISE=null, muted=false;

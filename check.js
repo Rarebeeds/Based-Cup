@@ -156,6 +156,10 @@ function statDerived(c){ const s=STATS[c], sp=speedSplit(c); return {
 const imgFor=c=> IMG[c]||imgP;
 const BALL_R=13;
 const SPRINT_MULT=1.55;
+// b95 touch movement tuning: map joystick TILT -> movement input so a normal push = FULL normal speed
+// (fixes the "walking in concrete" feel), and NOT tied to sprint (sprint is now a dedicated button).
+const TOUCH_MOVE_DEADZONE=0.16;   // ignore tiny stick jitter below this tilt fraction
+const TOUCH_MOVE_FULLTILT=0.60;   // at/above this tilt the joystick delivers FULL input (magnitude 1) = same as a full keyboard press
 // ---- Stat-model tuning (Phase 2, b55) — easily tweakable. grabCap is NOT here (stays constant 48). ----
 const STEAL_BASE=0.30;        // per-contest steal chance when defender.defense == carrier.dribble (even match)
 const STEAL_WEIGHT=0.035;     // +/- chance per point of (defender.def - carrier.drb); halved for the /20 stat scale (b74)
@@ -352,16 +356,21 @@ cv.addEventListener('contextmenu',e=>e.preventDefault());
 let joyVec={x:0,y:0}, joyActive=false, touchKick=false, touchSprint=false, joyId=null;
 const joy=document.getElementById('joy'), stick=document.getElementById('stick');
 function joyXY(t){const r=joy.getBoundingClientRect();
-  let dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2);
+  const dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2);
   const mag=Math.hypot(dx,dy), max=r.width/2;
-  if(mag>max){dx=dx/mag*max; dy=dy/mag*max;}
-  stick.style.left=(50+dx/max*40)+'%'; stick.style.top=(50+dy/max*40)+'%';
-  joyVec={x:dx/max,y:dy/max};
-  touchSprint = (mag/max) > 0.9;}      // shove the stick to the rim to sprint (no extra button)
+  // stick visual follows the finger (clamped to the rim)
+  let vdx=dx, vdy=dy; if(mag>max){vdx=dx/mag*max; vdy=dy/mag*max;}
+  stick.style.left=(50+vdx/max*40)+'%'; stick.style.top=(50+vdy/max*40)+'%';
+  // b95: OUTPUT = unit direction * gained magnitude — a moderate push already gives FULL normal speed
+  // (no "concrete"), and the joystick NO LONGER triggers sprint (that's a dedicated button now).
+  const raw=Math.min(1, mag/max);
+  const out = raw<=TOUCH_MOVE_DEADZONE ? 0 : Math.min(1,(raw-TOUCH_MOVE_DEADZONE)/(TOUCH_MOVE_FULLTILT-TOUCH_MOVE_DEADZONE));
+  const ux = mag>0?dx/mag:0, uy = mag>0?dy/mag:0;
+  joyVec={x:ux*out, y:uy*out};}
 function joyFinger(e){ for(const t of e.changedTouches){ if(t.identifier===joyId) return t; } return null; }
 joy.addEventListener('touchstart',e=>{const t=e.changedTouches[0]; joyId=t.identifier; joyActive=true; joyXY(t); e.preventDefault();},{passive:false});
 joy.addEventListener('touchmove',e=>{const t=joyFinger(e); if(t) joyXY(t); e.preventDefault();},{passive:false});
-function joyRelease(e){ if(joyFinger(e)){ joyActive=false; touchSprint=false; joyVec={x:0,y:0}; joyId=null; stick.style.left='50%'; stick.style.top='50%'; } e.preventDefault(); }
+function joyRelease(e){ if(joyFinger(e)){ joyActive=false; joyVec={x:0,y:0}; joyId=null; stick.style.left='50%'; stick.style.top='50%'; } e.preventDefault(); }   // b95: sprint is no longer tied to the joystick (dedicated button)
 joy.addEventListener('touchend',joyRelease,{passive:false});
 joy.addEventListener('touchcancel',joyRelease,{passive:false});
 const kickBtn=document.getElementById('kickBtn');
@@ -371,6 +380,11 @@ kickBtn.addEventListener('touchcancel',e=>{touchKick=false;e.preventDefault()},{
 // b85: dedicated mobile LUNGE button — distinct from KICK; sets the same edge-triggered request
 const lungeBtn=document.getElementById('lungeBtn');
 if(lungeBtn){ lungeBtn.addEventListener('touchstart',e=>{ lungeReq=true; e.preventDefault(); },{passive:false}); }
+// b95: dedicated mobile SPRINT button — HOLD to sprint (replaces the accidental rim-of-joystick trigger). Costs stamina as before.
+const sprintBtn=document.getElementById('sprintBtn');
+if(sprintBtn){ sprintBtn.addEventListener('touchstart',e=>{touchSprint=true;e.preventDefault()},{passive:false});
+  sprintBtn.addEventListener('touchend',e=>{touchSprint=false;e.preventDefault()},{passive:false});
+  sprintBtn.addEventListener('touchcancel',e=>{touchSprint=false;e.preventDefault()},{passive:false}); }
 
 // ---- Audio (all synthesized — no external files) ----
 let actx=null, master=null, NOISE=null, muted=false;

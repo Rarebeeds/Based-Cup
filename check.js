@@ -781,7 +781,7 @@ function stepLunge(pl){
 function tryLunge(pl){
   if(!pl || pl.out) return;
   if(pl.lungeCD>0 || pl.lunging>0) return;
-  if(kickoffLock>0 || goalLock>0 || halftime) return;
+  if(goalLock>0 || halftime) return;   // b100: lunge is available at kickoff too — was blocked for ~0.9s (kickoffLock) after EVERY kickoff/reset, which (with the pre-b97 CPU foul-spam) made it feel dead. Movement was already allowed during kickoff; goal/half-time freeze still blocks.
   if(pl.stamina < LUNGE_MIN_STAMINA) return;
   pl.stamina = clamp(pl.stamina - LUNGE_STAMINA, 0, 1);   // small, tunable stamina cost
   pl.lungeCD = LUNGE_COOLDOWN; pl.lunging = LUNGE_DURATION; pl.lungeFoulDone = false;
@@ -2598,7 +2598,7 @@ function gpInit(){ gp = players? {x:players.t.x,y:players.t.y,vx:0,vy:0,lvx:0,lv
 // b85: guest predicts its OWN lunge locally (mirrors tryLunge on the host) so the dash is instant; the host stays authoritative and reconciliation keeps it aligned.
 function guestPredictLunge(){
   if(!gp || gp.lunging>0 || gp.lungeCD>0) return;
-  if(kickoffLock>0 || goalLock>0 || halftime) return;
+  if(goalLock>0 || halftime) return;   // b100: match tryLunge — lunge available at kickoff (host+guest consistent)
   const t=players.t; if(!t) return;
   if(t.stamina!=null && t.stamina<LUNGE_MIN_STAMINA) return;
   gp.lungeCD=LUNGE_COOLDOWN; gp.lunging=LUNGE_DURATION;
@@ -3612,7 +3612,12 @@ function _beginGame(){
   showMatchBanner();
 }
 function togglePause(){
-  if(netRole) return;   // can't pause a live online match
+  if(netRole){   // b100: can't FREEZE a live online match (would desync), but Esc must still open/close the in-match MENU (Resume / leave to Menu). The sim keeps running underneath.
+    const ps=$('pauseScreen'), opening=ps.classList.contains('hide');
+    ps.classList.toggle('hide', !opening);
+    const big=ps.querySelector('.big'); if(big) big.textContent = opening ? 'MENU' : 'PAUSED';
+    return;
+  }
   if(state==='play'){ state='paused';
     $('pauseScreen').classList.remove('hide'); $('pauseBtn').textContent='▶'; }
   else if(state==='paused'){ state='play';

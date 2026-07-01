@@ -353,9 +353,16 @@ cv.addEventListener('mousemove',e=>{const p=toLogical(e);mouse.x=p.x;mouse.y=p.y
 cv.addEventListener('mouseenter',()=>{mouse.active=true;});
 cv.addEventListener('mouseleave',()=>{mouse.active=false;});
 cv.addEventListener('mousedown',e=>{ if(e.button===0)keys['kick']=true; else if(e.button===2){ lungeReq=true; e.preventDefault(); } });   // b85: RIGHT-CLICK = lunge (edge); left-click still kicks
-cv.addEventListener('auxclick',e=>{ if(e.button===2){ lungeReq=true; e.preventDefault(); } });   // b98: some browsers/devices don't deliver a right-button mousedown to the page — auxclick does
 addEventListener('mouseup',e=>{if(e.button===0)keys['kick']=false;});
-cv.addEventListener('contextmenu',e=>{ e.preventDefault(); if(state==='play') lungeReq=true; });   // b98: contextmenu is the canonical right-click signal (always fires) — the reliable lunge trigger; menu still suppressed
+// b99: RIGHT-CLICK = lunge ONLY, and the browser context menu is fully suppressed across the WHOLE play
+// area during a match — not just the <canvas>. ROOT CAUSE of the flaky right-click / "menu inconsistently
+// pops": the contextmenu preventDefault was on `cv` ONLY, so a right-click landing on the HUD / player
+// cards / pause button / letterbox margin (anything but the canvas) popped the native menu AND didn't
+// lunge (the lunge trigger was cv-scoped too). This document-level handler catches every right-click in
+// the play area. The in-game MENU/PAUSE is on the ESC key (keydown above), never on right-click.
+addEventListener('contextmenu',e=>{
+  if(state==='play' || state==='paused'){ e.preventDefault(); if(state==='play') lungeReq=true; }
+});
 
 // touch joystick — bind to ONE finger by its identifier so a second finger (KICK) can never
 // hijack the stick. The old code read touches[0] (the oldest finger on screen), which made the

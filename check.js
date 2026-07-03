@@ -1590,9 +1590,12 @@ async function guestAddWallet(){
   showToast("Wallet added — you're in the hourly 0.1 SOL giveaway! 🎉",'#69db7c');
   refreshGuestBanner(); refreshAcctBtn();
 }
+let guestPromptDismissed=false;   // b102: session-level — once the guest closes the SOL prompt, don't re-nag it on menu re-entry
 function refreshGuestBanner(){
   const b=$('guestBanner'); if(!b) return;
-  b.classList.toggle('hide', !(account && account.guest && !account.addr));
+  const show = !guestPromptDismissed && account && account.guest && !account.addr;
+  b.classList.toggle('hide', !show);
+  const ss=$('startScreen'); if(ss) ss.classList.toggle('guestPrompt', !!show);   // b102: landscape shifts the PLAY bar clear of the prompt only while it's up
 }
 function doLogin(){
   const last=DB.get('sh_last'), a=accounts()[(last||'').toLowerCase()], pin=$('loginPin').value;
@@ -1829,6 +1832,7 @@ $('regBtn').onclick=doRegister;
 $('connectPhantom').onclick=connectPhantom;
 $('guestBtn').onclick=playAsGuest;
 $('guestAddWalletBtn').onclick=guestAddWallet;
+{ const gc=$('guestBannerClose'); if(gc) gc.onclick=()=>{ guestPromptDismissed=true; refreshGuestBanner(); }; }   // b102: dismiss + persist for the session (also clears the .guestPrompt shift)
 $('loginBtn').onclick=doLogin;
 $('goLogin').onclick=()=>showLogin(DB.get('sh_last'));
 $('goRegister').onclick=showReg;

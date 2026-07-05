@@ -3597,8 +3597,10 @@ function enterMatchChrome(){
   $('xBtn').classList.add('hide');                          // X link off during a match (was overlapping the scorebug)
   $('touch').style.display = IS_TOUCH ? 'block' : 'none';   // show the joystick + KICK on phones
   document.body.classList.toggle('touch-match', IS_TOUCH);  // move player cards up top, free the bottom for thumbs
-  const b = IS_TOUCH ? '156px' : '10px';                    // lift the pot/ping pills above the joystick on touch
-  if($('potTag')) $('potTag').style.bottom=b; if($('pingTag')) $('pingTag').style.bottom=b;
+  const b = IS_TOUCH ? '156px' : '10px';                    // lift the POT pill above the joystick on touch
+  if($('potTag')) $('potTag').style.bottom=b;
+  // b103: ping pill goes to the very BOTTOM (centre, between the left joystick and right KICK cluster — out of the way), not lifted to mid-screen
+  if($('pingTag')) $('pingTag').style.bottom = IS_TOUCH ? 'calc(env(safe-area-inset-bottom, 0px) + 6px)' : '10px';
   checkOrient();
 }
 // b96: ENFORCE landscape GLOBALLY (lobby + in-match). Portrait is blocked entirely on touch devices —

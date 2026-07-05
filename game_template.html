@@ -64,7 +64,7 @@
   .pc-bar i.low{background:linear-gradient(90deg,#fa5252,#ff8787)}
   /* Overlays */
   .overlay{position:absolute;inset:0;display:flex;flex-direction:column;
-    align-items:center;justify-content:safe center;gap:18px;z-index:20;padding:14px 0;
+    align-items:center;justify-content:safe center;gap:18px;z-index:56;padding:14px 0;   /* b103: above the top-left profile chip (z55) so menu back-buttons are never covered; the lobby (#startScreen) is pinned back to z20 below */
     /* scroll (instead of clipping the top) when a card is taller than a short landscape phone;
        'safe center' keeps it centred when it fits but never pushes the top out of reach */
     overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;
@@ -85,7 +85,11 @@
     box-shadow:0 4px 0 #2b8a3e}
   button.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #2b8a3e}
   button.btn.alt{background:linear-gradient(180deg,#ffc9c9,#ff8787);box-shadow:0 4px 0 #c92a2a}
-  button.btn.ghost{background:#16361f;color:#cfeed8;box-shadow:0 4px 0 #0c2113}
+  /* b103: BACK/secondary buttons more prominent + a clear tap target (FIFA-clean, consistent across screens) */
+  button.btn.ghost{background:#1d5233;color:#eafaf0;border:2px solid #4fae6e;box-shadow:0 4px 0 #0c2113;
+    min-height:48px;padding:12px 26px;font-weight:700;letter-spacing:1.5px}
+  button.btn.ghost:hover{background:#246640;border-color:#69db7c}
+  button.btn.ghost:active{transform:translateY(2px);box-shadow:0 2px 0 #0c2113}
   .seg{display:inline-flex;border:2px solid #1f5234;border-radius:12px;overflow:hidden}
   .seg button{cursor:pointer;border:none;background:#0f2417;color:#cfeed8;
     padding:9px 14px;font-weight:bold;font-size:13px;letter-spacing:.5px}
@@ -513,9 +517,9 @@
   #lockerScreen .loTitle{flex:1;text-align:center;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;letter-spacing:5px;font-size:25px;color:var(--fc-ink)}
   /* secondary buttons (exit-back + carousel nav) — same FIFA-clean family as the EQUIP CTA */
   /* smooth top-left back chevron — clean FIFA-token icon button */
-  #lockerScreen .loBackBtn{width:42px;height:42px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;
-    background:var(--fc-card);border:1px solid var(--fc-line);color:var(--fc-ink);font-size:28px;line-height:1;font-weight:700;cursor:pointer;
-    box-shadow:0 5px 14px rgba(20,44,74,.12);transition:border-color .15s,box-shadow .15s,transform .08s}
+  #lockerScreen .loBackBtn{width:50px;height:50px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;
+    background:var(--fc-card);border:2px solid var(--fc-accent);color:var(--fc-ink);font-size:32px;line-height:1;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 16px rgba(20,44,74,.22);transition:border-color .15s,box-shadow .15s,transform .08s}
   #lockerScreen .loBackBtn span{margin-top:-3px}
   #lockerScreen .loBackBtn:hover{border-color:var(--fc-ink);box-shadow:0 7px 18px rgba(20,44,74,.18)}
   #lockerScreen .loBackBtn:active{transform:scale(.92)}
@@ -627,7 +631,7 @@
      Reuses the Locker design system (--fc-* tokens, Oswald, ore-tier card styling). SCOPED to #startScreen. ============ */
   #startScreen{ --fc-ink:#10243a;--fc-ink2:#5d6e80;--fc-accent:#10a35a;--fc-accent2:#16c97c;--fc-gold:#e7b53b;
     --fc-card:#ffffff;--fc-line:rgba(16,36,58,.12);--fc-shadow:0 22px 56px rgba(20,44,74,.32);--fc-navy:#27517a;
-    display:block;padding:0;overflow:hidden;background:#08190f;color:#eafaf0 }
+    display:block;padding:0;overflow:hidden;background:#08190f;color:#eafaf0;z-index:20 }   /* b103: lobby stays BELOW the profile chip (z55) so the chip shows on the lobby; other overlays are z56 (above it) */
   /* SWAPPABLE full-screen backdrop (stadium/pitch). To reskin later: change THIS rule (single source). */
   #lobbyBackdrop{ position:absolute;inset:0;z-index:0;overflow:hidden;
     background:radial-gradient(150% 92% at 50% 130%,rgba(120,240,170,.20),transparent 56%),
@@ -836,45 +840,50 @@
     #startScreen{ overflow:hidden }
     #lobbyBackdrop{ position:absolute }
     #lobbyRoot{ position:absolute;inset:0;min-height:0;
-      grid-template-columns:minmax(100px,132px) 1fr minmax(118px,156px);
+      grid-template-columns:minmax(104px,138px) 1fr minmax(122px,160px);
       grid-template-rows:auto minmax(0,1fr) auto;
       grid-template-areas:"top top top" "railL stage railR" "play play play";
-      gap:3px 8px;
-      padding:max(3px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)) }
+      gap:7px 14px;   /* b103: more breathing room (was 3px 8px) */
+      padding:max(6px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)) }
+
+    /* b103: keep the top-left profile chip from ever reaching the LOCKER rail (cap width + ellipsis the name) */
+    #acctBtn{ max-width:min(232px,34vw) }
+    #acctName{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0 }
 
     /* thin title row (title small + counter inline) */
-    #lobbyTop{ flex-direction:row;gap:10px;align-items:center;justify-content:center }
-    #startScreen .gameTitle{ font-size:17px }
+    #lobbyTop{ flex-direction:row;gap:12px;align-items:center;justify-content:center }
+    #startScreen .gameTitle{ font-size:19px }
     #startScreen .sub{ display:none }
-    #startScreen #liveCountMenu{ font-size:10px;padding:2px 10px }
+    #startScreen #liveCountMenu{ font-size:11px;padding:3px 12px }
 
     /* rails: compact vertical, small buttons that ellipsis rather than overflow the narrow column */
-    .lobbyRail{ display:flex;flex-direction:column;gap:5px;align-self:center }
-    .lobbyRail .btn{ width:100%;font-size:11px;padding:6px 9px;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:10px;box-shadow:0 3px 9px rgba(0,0,0,.3) }
+    .lobbyRail{ display:flex;flex-direction:column;gap:8px;align-self:center }
+    .lobbyRail .btn{ width:100%;font-size:12px;padding:9px 11px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:11px;box-shadow:0 3px 9px rgba(0,0,0,.3) }
     #lobbyRailL #lockerBtn{ grid-column:auto }
     #startScreen #menuBoard{ display:none }
 
-    /* showcase: sized by HEIGHT (vh) so the banner + animated character fit the short row */
-    #lobbyStage{ gap:3px;justify-content:center }
-    #lobbyTopRow{ gap:6px;align-items:stretch }
-    #lobbyShowcase{ width:min(50vh,228px) }
-    #lobbyOvr{ font-size:clamp(20px,5vh,30px) }
-    .lbFrontHead{ min-width:54px;padding-right:7px }
-    .lbFace{ padding:7px 9px;gap:8px }
-    .lbStats{ gap:1px 7px } .lbStat{ font-size:8.5px } .lbStat .lbSL{ width:26px } .lbStat .lbSB{ height:4px }
-    #inviteSlot{ width:clamp(40px,7vh,54px) }
-    #inviteSlot .invitePlus{ font-size:20px } #inviteSlot .inviteLbl{ font-size:8px }
-    #lobbyCharBox{ width:min(62vh,286px);aspect-ratio:2/1 }
-    #lobbyHeroName{ font-size:11px;padding:2px 12px;bottom:0 }
+    /* showcase: sized by HEIGHT (vh) so the banner + animated character fit the short row (with room to breathe) */
+    #lobbyStage{ gap:6px;justify-content:center }
+    #lobbyTopRow{ gap:9px;align-items:stretch }
+    #lobbyShowcase{ width:min(53vh,244px) }
+    #lobbyOvr{ font-size:clamp(22px,5.4vh,32px) }
+    .lbFrontHead{ min-width:58px;padding-right:8px }
+    .lbFace{ padding:8px 11px;gap:9px }
+    .lbStats{ gap:2px 8px } .lbStat{ font-size:9px } .lbStat .lbSL{ width:28px } .lbStat .lbSB{ height:4px }
+    #inviteSlot{ width:clamp(44px,7.4vh,58px) }
+    #inviteSlot .invitePlus{ font-size:22px } #inviteSlot .inviteLbl{ font-size:8px }
+    #lobbyCharBox{ width:min(66vh,300px);aspect-ratio:2/1 }
+    #lobbyHeroName{ font-size:12px;padding:3px 14px;bottom:0 }
 
-    /* PLAY bar: horizontal — TYPE + MODE selectors + one PLAY, always visible on the short screen */
-    #lobbyPlayZone{ flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;gap:5px 14px;padding-bottom:1px }
-    .lobbySelectors{ gap:12px;align-items:center }
-    .lobbySelBlock{ gap:2px }
-    .lobbySelLbl{ font-size:8px }
-    .seg.lobbySeg button{ font-size:10.5px;padding:6px 10px;letter-spacing:.4px }
+    /* PLAY bar: horizontal — TYPE + MODE selectors + one PLAY. Kept sized to stay on ONE line even at 667px
+       wide (wrapping to 2 lines eats the vertical budget + collides with the guest pill). */
+    #lobbyPlayZone{ flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 14px;padding-bottom:2px }
+    .lobbySelectors{ gap:14px;align-items:center }
+    .lobbySelBlock{ gap:3px }
+    .lobbySelLbl{ font-size:9px }
+    .seg.lobbySeg button{ font-size:11px;padding:7px 11px;letter-spacing:.4px }
     .lobbyModeHint{ display:none }              /* the hint costs a whole row — drop it in landscape */
-    #startScreen #playBtn{ width:auto;min-width:168px;font-size:17px;padding:10px 30px;border-radius:12px }
+    #startScreen #playBtn{ width:auto;min-width:168px;font-size:17px;padding:11px 30px;border-radius:13px }
 
     /* guest prompt: a COMPACT button-pill docked in the gap just ABOVE the PLAY bar, so it clears PLAY,
        the selectors AND the side rails (the full 2-line card was too tall/wide for the short viewport). */
@@ -900,7 +909,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b102 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b103 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -5056,8 +5065,10 @@ function enterMatchChrome(){
   $('xBtn').classList.add('hide');                          // X link off during a match (was overlapping the scorebug)
   $('touch').style.display = IS_TOUCH ? 'block' : 'none';   // show the joystick + KICK on phones
   document.body.classList.toggle('touch-match', IS_TOUCH);  // move player cards up top, free the bottom for thumbs
-  const b = IS_TOUCH ? '156px' : '10px';                    // lift the pot/ping pills above the joystick on touch
-  if($('potTag')) $('potTag').style.bottom=b; if($('pingTag')) $('pingTag').style.bottom=b;
+  const b = IS_TOUCH ? '156px' : '10px';                    // lift the POT pill above the joystick on touch
+  if($('potTag')) $('potTag').style.bottom=b;
+  // b103: ping pill goes to the very BOTTOM (centre, between the left joystick and right KICK cluster — out of the way), not lifted to mid-screen
+  if($('pingTag')) $('pingTag').style.bottom = IS_TOUCH ? 'calc(env(safe-area-inset-bottom, 0px) + 6px)' : '10px';
   checkOrient();
 }
 // b96: ENFORCE landscape GLOBALLY (lobby + in-match). Portrait is blocked entirely on touch devices —

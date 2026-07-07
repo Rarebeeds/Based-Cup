@@ -2653,7 +2653,12 @@ function predictGuestSelf(){
   if(auth){
     const ex=auth.x-gp.x, ey=auth.y-gp.y, err=Math.hypot(ex,ey);
     if(err>200){ gp.x=auth.x; gp.y=auth.y; gp.vx=0; gp.vy=0; }   // only hard-snap on a real desync (goal reset)
-    else { const k = err>60 ? 0.16 : 0.05; gp.x+=ex*k; gp.y+=ey*k; }
+    // b104: the firm-correction threshold was 60px — but the guest's OWN player legitimately leads the freshest
+    // authoritative snapshot by ~v*RTT (≈90px at the ~300ms relay floor), because that snapshot echoes the guest's
+    // input a full round-trip late. So during NORMAL movement the 0.16 pull kept dragging the local prediction back
+    // toward the RTT-delayed position = the sluggish "ankle weight" feel (the lunge's burst dwarfs the pull, so it
+    // felt fine). Now the gentle 0.04 lets the prediction LEAD in real time; the firm tier only catches genuine drift.
+    else { const k = err>150 ? 0.16 : 0.04; gp.x+=ex*k; gp.y+=ey*k; }
   }
   t.x=gp.x; t.y=gp.y; t.lunging=gp.lunging; t.lvx=gp.lvx; t.lvy=gp.lvy;   // mirror the predicted lunge for the whoosh visual
   // aim arrow: on touch follow the joystick (no mouse exists — this was the frozen "halfway" arrow);

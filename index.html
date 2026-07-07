@@ -677,7 +677,15 @@
   #startScreen .btn.blue{ border-left:4px solid #3b82c4 }
   #startScreen .btn.yellow{ border-left:4px solid var(--fc-gold) }
   #startScreen #lockerBtn{ border-left:4px solid var(--fc-accent) }
-  #startScreen #storeBtn{ border-left:4px solid #8a63d2 }
+  #startScreen #local2pBtn{ border-left:4px solid #d29a3b }
+  /* b107: SOCIAL + STORE are now small corner ICON buttons (Fortnite-style), out of the lobby button stack.
+     Styled like the notification bell; positioned in the top corners clear of acct chip / bell / X / badges. */
+  .cornerIcon{position:absolute;z-index:55;background:rgba(10,20,34,.85);border:1px solid rgba(255,255,255,.16);
+    border-radius:50%;width:42px;height:42px;font-size:19px;line-height:1;cursor:pointer;color:#fff;padding:0;
+    display:flex;align-items:center;justify-content:center;font-family:sans-serif}
+  .cornerIcon:hover{background:rgba(20,42,66,.95);border-color:rgba(255,255,255,.32)}
+  #socialBtn.cornerIcon{top:60px;left:12px}     /* top-left, tucked under the account chip (top:12, ~40px tall) */
+  #storeBtn.cornerIcon{top:12px;right:112px}    /* top-right row: BELL(right:12) · X(right:62) · STORE(right:112) */
   #startScreen #menuBoard{ background:rgba(255,255,255,.95);border:1px solid var(--fc-line);border-radius:14px;
     box-shadow:0 8px 20px rgba(0,0,0,.3);cursor:pointer }
   #startScreen #menuBoard:hover{ border-color:var(--fc-accent) }
@@ -803,8 +811,8 @@
       grid-template-columns:1fr;grid-template-rows:auto minmax(min-content,1fr) auto auto auto;
       grid-template-areas:"top" "stage" "railL" "railR" "play";gap:8px;padding:8px 14px 64px;
       padding-top:max(64px,calc(env(safe-area-inset-top) + 58px)) }   /* top pad clears the account chip/bell; bottom pad clears the region dock + version badge */
-    /* very narrow phones (~320px): stop the account chip from colliding with the X/bell buttons */
-    #acctBtn{ max-width:calc(100vw - 122px) }
+    /* very narrow phones (~320px): stop the account chip from colliding with the STORE/X/bell buttons (b107: +STORE icon → reserve one more 42px slot) */
+    #acctBtn{ max-width:calc(100vw - 172px) }
     #acctName{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0 }
     #startScreen .gameTitle{ font-size:30px }
     .lobbyRail{ display:grid;grid-template-columns:1fr 1fr;gap:7px;align-self:auto }
@@ -900,6 +908,9 @@
   <canvas id="cv"></canvas>
   <button id="acctBtn" class="hide"><img id="acctPic" alt=""><span id="acctName">player</span><span id="acctLvl" class="lvlchip">Lv1</span><span id="acctCoins" class="lvlchip hide" style="background:#3a2e0a;color:#ffd43b"></span></button>
   <button id="bellBtn" class="hide">🔔<span id="bellCount" class="bellCount hide">0</span></button>
+  <!-- b107: SOCIAL + STORE as corner ICON buttons (moved out of the lobby button stack). Same IDs/handlers; shown on menus, hidden in-match (mirrors #xBtn). -->
+  <button id="socialBtn" class="cornerIcon hide" title="Friends &amp; chat" aria-label="Social">👥</button>
+  <button id="storeBtn" class="cornerIcon hide" title="Store" aria-label="Store">🛍️</button>
   <a id="xBtn" class="hide" href="https://x.com/BasedCup1" target="_blank" rel="noopener noreferrer" title="Follow Based Cup on X"
      style="position:absolute;top:12px;right:62px;z-index:55;background:rgba(10,20,34,.85);border:1px solid rgba(255,255,255,.16);border-radius:50%;width:42px;height:42px;font-size:18px;font-weight:bold;color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;font-family:sans-serif">𝕏</a>
   <div id="challengePopup" class="hide">
@@ -908,7 +919,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b106 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b107 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1132,12 +1143,11 @@
       <div id="lobbyRailL" class="lobbyRail">
         <button class="btn" id="lockerBtn">🎽 LOCKER — <b id="lockerBtnName">your character</b></button>
         <button class="btn grey" id="practiceBtn">🎯 PRACTICE</button>
-        <button class="btn" id="storeBtn">🛒 STORE</button>
+        <button class="btn" id="local2pBtn">🎮 LOCAL 2P</button>   <!-- b107: two players, one keyboard — desktop only (hidden on touch) -->
       </div>
 
       <!-- RIGHT EDGE RAIL -->
       <div id="lobbyRailR" class="lobbyRail">
-        <button class="btn blue" id="socialBtn">👥 SOCIAL</button>
         <button class="btn yellow" id="boardBtn">🏆 LEADERBOARD</button>
         <div id="menuBoard" title="Open the full leaderboard">
           <div class="dhead"><span>🏆 TOP PLAYERS</span><span class="sub">this hour ›</span></div>
@@ -1808,6 +1818,7 @@ addEventListener('keydown',e=>{
   if(e.target && e.target.tagName==='INPUT') return;   // let form fields work normally
   if(typeof e.key!=='string') return;   // synthetic events (browser autofill / extensions e.g. Phantom) fire with key/code undefined -> e.key.toLowerCase() threw (b53)
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  if(state==='play' && (e.key===' '||e.key==='Enter'||e.key==='/')) e.preventDefault();   // b107: local-2P kick/lunge keys — stop page scroll / focused-button re-activation
   keys[e.key.toLowerCase()]=true; if(typeof e.code==='string') keys[e.code.toLowerCase()]=true;
   if(e.key.toLowerCase()==='p' || e.key==='Escape'){ if(state==='play'||state==='paused') togglePause(); }
 });
@@ -2059,6 +2070,9 @@ function cornerClampBall(){
 // aim: human -> mouse (or joystick/movement); AI -> toward attacking (left) goal
 function setAim(pl){
   if(pl.who==='p'){
+    // b107: local 2P is keyboard-only for BOTH players (the mouse can't serve two) — P1's aim follows
+    // its movement/facing, same as P2. Single-player / online keep the mouse (or joystick on touch).
+    if(mode==='2p'){ if(Math.hypot(pl.vx,pl.vy)>0.5) pl.aim=Math.atan2(pl.vy,pl.vx); return; }
     // aim follows the mouse only — movement keys never change kick direction
     if(joyActive && (joyVec.x||joyVec.y)) pl.aim=Math.atan2(joyVec.y,joyVec.x);
     else if(!IS_TOUCH) pl.aim=Math.atan2(mouse.y-pl.y, mouse.x-pl.x);   // touch: hold heading when stick released
@@ -2082,12 +2096,19 @@ function controlPlayer(pl){
     if(keys['arrowleft'])ax-=1; if(keys['arrowright'])ax+=1;
   }
   const m=Math.hypot(ax,ay); if(m>1){ax/=m;ay/=m;}
-  const sprint = pl.who==='p' ? (keys['shiftleft']||keys['shift']||touchSprint) : keys['shiftright'];
-  if(pl.who==='p' && lungeReq){ lungeReq=false; tryLunge(pl); }   // b85: local human (host/offline) lunges; guest routes via sendGuestInput
+  // b107: in local 2P, P1 sprint must be ShiftLEFT only — the generic keys['shift'] is set by EITHER shift,
+  // so P2's ShiftRight would otherwise also sprint P1. Single-player keeps either shift for P1.
+  const sprint = pl.who==='p'
+    ? (keys['shiftleft'] || (mode!=='2p' && keys['shift']) || touchSprint)
+    : keys['shiftright'];
+  // LUNGE — P1: right-click/contextmenu (all modes) + F key (local 2P). P2: Slash key (local 2P; the
+  // P2 branch of controlPlayer only runs when mode==='2p'). Edge-consume so a held key fires once.
+  if(pl.who==='p' && (lungeReq || (mode==='2p' && keys['f']))){ lungeReq=false; keys['f']=false; tryLunge(pl); }
+  else if(pl.who==='t' && (keys['slash'] || keys['/'])){ keys['slash']=false; keys['/']=false; tryLunge(pl); }
   applyMove(pl,ax,ay,sprint);
   let held=false;
-  if(pl.who==='p'&&(keys['kick']||touchKick))held=true;
-  if(pl.who==='t'&&keys['enter'])held=true;
+  if(pl.who==='p'&&(keys['kick']||touchKick||(mode==='2p'&&keys['space'])))held=true;   // b107: P1 kick = Space in local 2P (mouse-free)
+  if(pl.who==='t'&&keys['enter'])held=true;                                             // P2 kick = Enter
   chargeKick(pl, held);
 }
 function applyMove(pl,ax,ay,sprint){
@@ -3244,6 +3265,7 @@ function enterLobby(){
     .forEach(s=>$(s).classList.add('hide'));   // hide splash too — otherwise its dim layer stacks under the menu
   $('startScreen').classList.remove('hide');
   $('xBtn').classList.remove('hide');   // X link is available from the main menu onward, not on the intro
+  setCornerIcons(true);                 // b107: SOCIAL/STORE corner icons appear with the menu
   refreshAcctBtn(); renderDaily(); syncRegionUI(); setMenuDocks(true); renderMenuTop3();
   renderLobbyShowcase();   // b90: paint the equipped-character showcase each time we enter the lobby
   startMusic('lobby');
@@ -3664,6 +3686,9 @@ function setMenuDocks(show){
   ['dailyDock','serverDock'].forEach(id=>{ const el=$(id); if(el) el.classList.toggle('hide', !show); });
   if(!show){ closeServerPopup(); const d=$('dailyDock'); if(d) d.classList.remove('open'); }
 }
+// b107: SOCIAL/STORE corner icons — visible on the menus/lobby (overlays cover them elsewhere),
+// hidden in-match. Toggled alongside #xBtn (same lifecycle).
+function setCornerIcons(show){ ['socialBtn','storeBtn'].forEach(id=>{ const el=$(id); if(el) el.classList.toggle('hide', !show); }); }
 $('dailyTab').onclick=()=>{ const d=$('dailyDock'); d.classList.toggle('open'); if(d.classList.contains('open')) renderDaily(); };
 
 $('cancelMatch').onclick=cancelMatch;
@@ -4058,6 +4083,12 @@ $('selStartBtn').onclick=()=>{
 // no character/opponent select screen. Defaults to vs-CPU at the current difficulty.
 $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
   ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };   // b101: respects the lobby-selected gameMode (was hard-coded goals)
+// b107: LOCAL 2-PLAYER (two humans, one keyboard, one screen) — desktop only. Reuses the existing mode==='2p'
+// machinery; controls: P1 WASD move · Space kick · F lunge · ShiftLeft sprint | P2 Arrows move · Enter kick ·
+// / (Slash) lunge · ShiftRight sprint. Aim follows each player's facing (keyboard-only, no mouse). Respects
+// the lobby MODE selector (goals/keep-away). Hidden on touch (two people can't share a phone).
+$('local2pBtn').onclick=()=>{ if(IS_TOUCH) return; audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
+  ranked=false; oppActive=true; mode='2p'; practiceOpp='2p'; csContext='practice'; beginGame(); };
 // b90 UI REMODEL: invite slot (2v2 placeholder). Hover (desktop) reveals INVITE via CSS; tap (mobile) toggles it;
 // clicking INVITE shows a clean styled "coming with 2v2" message — no real party functionality yet.
 (function(){ const slot=$('inviteSlot'), btn=$('inviteBtn'); if(!slot) return;
@@ -5073,8 +5104,10 @@ function showMatchBanner(){
 
 // touch devices get the on-screen joystick + KICK button (the #touch layer is display:none by default)
 const IS_TOUCH = (typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches) || (typeof window!=='undefined' && 'ontouchstart' in window);
+if(IS_TOUCH){ const _l2=$('local2pBtn'); if(_l2) _l2.classList.add('hide'); }   // b107: LOCAL 2P is desktop-only (two people can't share one phone)
 function enterMatchChrome(){
   $('xBtn').classList.add('hide');                          // X link off during a match (was overlapping the scorebug)
+  setCornerIcons(false);                                    // b107: hide SOCIAL/STORE corner icons in-match
   $('touch').style.display = IS_TOUCH ? 'block' : 'none';   // show the joystick + KICK on phones
   document.body.classList.toggle('touch-match', IS_TOUCH);  // move player cards up top, free the bottom for thumbs
   const b = IS_TOUCH ? '156px' : '10px';                    // lift the POT pill above the joystick on touch
@@ -5125,7 +5158,7 @@ function gotoMenu(){
   if(netRole && NET.ws){ NET.intentionalClose=true; NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
   NET.p2pReset();                            // tear down any direct connection so the next match renegotiates
   netRole=null; gp=null; resetWager(); oppChar=null;
-  $('touch').style.display='none'; $('xBtn').classList.remove('hide');
+  $('touch').style.display='none'; $('xBtn').classList.remove('hide'); setCornerIcons(true);   // b107: restore SOCIAL/STORE corner icons on return to the lobby
   document.body.classList.remove('show-rotate'); document.body.classList.remove('touch-match');
   clearTimeout(htTimer); hideHalftime(); halftime=false;
   clearTimeout(_bannerTimer); $('matchBanner').classList.add('hide');

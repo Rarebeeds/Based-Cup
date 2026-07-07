@@ -340,6 +340,7 @@ addEventListener('keydown',e=>{
   if(e.target && e.target.tagName==='INPUT') return;   // let form fields work normally
   if(typeof e.key!=='string') return;   // synthetic events (browser autofill / extensions e.g. Phantom) fire with key/code undefined -> e.key.toLowerCase() threw (b53)
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  if(state==='play' && (e.key===' '||e.key==='Enter'||e.key==='/')) e.preventDefault();   // b107: local-2P kick/lunge keys — stop page scroll / focused-button re-activation
   keys[e.key.toLowerCase()]=true; if(typeof e.code==='string') keys[e.code.toLowerCase()]=true;
   if(e.key.toLowerCase()==='p' || e.key==='Escape'){ if(state==='play'||state==='paused') togglePause(); }
 });
@@ -591,6 +592,9 @@ function cornerClampBall(){
 // aim: human -> mouse (or joystick/movement); AI -> toward attacking (left) goal
 function setAim(pl){
   if(pl.who==='p'){
+    // b107: local 2P is keyboard-only for BOTH players (the mouse can't serve two) — P1's aim follows
+    // its movement/facing, same as P2. Single-player / online keep the mouse (or joystick on touch).
+    if(mode==='2p'){ if(Math.hypot(pl.vx,pl.vy)>0.5) pl.aim=Math.atan2(pl.vy,pl.vx); return; }
     // aim follows the mouse only — movement keys never change kick direction
     if(joyActive && (joyVec.x||joyVec.y)) pl.aim=Math.atan2(joyVec.y,joyVec.x);
     else if(!IS_TOUCH) pl.aim=Math.atan2(mouse.y-pl.y, mouse.x-pl.x);   // touch: hold heading when stick released
@@ -614,12 +618,19 @@ function controlPlayer(pl){
     if(keys['arrowleft'])ax-=1; if(keys['arrowright'])ax+=1;
   }
   const m=Math.hypot(ax,ay); if(m>1){ax/=m;ay/=m;}
-  const sprint = pl.who==='p' ? (keys['shiftleft']||keys['shift']||touchSprint) : keys['shiftright'];
-  if(pl.who==='p' && lungeReq){ lungeReq=false; tryLunge(pl); }   // b85: local human (host/offline) lunges; guest routes via sendGuestInput
+  // b107: in local 2P, P1 sprint must be ShiftLEFT only — the generic keys['shift'] is set by EITHER shift,
+  // so P2's ShiftRight would otherwise also sprint P1. Single-player keeps either shift for P1.
+  const sprint = pl.who==='p'
+    ? (keys['shiftleft'] || (mode!=='2p' && keys['shift']) || touchSprint)
+    : keys['shiftright'];
+  // LUNGE — P1: right-click/contextmenu (all modes) + F key (local 2P). P2: Slash key (local 2P; the
+  // P2 branch of controlPlayer only runs when mode==='2p'). Edge-consume so a held key fires once.
+  if(pl.who==='p' && (lungeReq || (mode==='2p' && keys['f']))){ lungeReq=false; keys['f']=false; tryLunge(pl); }
+  else if(pl.who==='t' && (keys['slash'] || keys['/'])){ keys['slash']=false; keys['/']=false; tryLunge(pl); }
   applyMove(pl,ax,ay,sprint);
   let held=false;
-  if(pl.who==='p'&&(keys['kick']||touchKick))held=true;
-  if(pl.who==='t'&&keys['enter'])held=true;
+  if(pl.who==='p'&&(keys['kick']||touchKick||(mode==='2p'&&keys['space'])))held=true;   // b107: P1 kick = Space in local 2P (mouse-free)
+  if(pl.who==='t'&&keys['enter'])held=true;                                             // P2 kick = Enter
   chargeKick(pl, held);
 }
 function applyMove(pl,ax,ay,sprint){
@@ -1776,6 +1787,7 @@ function enterLobby(){
     .forEach(s=>$(s).classList.add('hide'));   // hide splash too — otherwise its dim layer stacks under the menu
   $('startScreen').classList.remove('hide');
   $('xBtn').classList.remove('hide');   // X link is available from the main menu onward, not on the intro
+  setCornerIcons(true);                 // b107: SOCIAL/STORE corner icons appear with the menu
   refreshAcctBtn(); renderDaily(); syncRegionUI(); setMenuDocks(true); renderMenuTop3();
   renderLobbyShowcase();   // b90: paint the equipped-character showcase each time we enter the lobby
   startMusic('lobby');
@@ -2196,6 +2208,9 @@ function setMenuDocks(show){
   ['dailyDock','serverDock'].forEach(id=>{ const el=$(id); if(el) el.classList.toggle('hide', !show); });
   if(!show){ closeServerPopup(); const d=$('dailyDock'); if(d) d.classList.remove('open'); }
 }
+// b107: SOCIAL/STORE corner icons — visible on the menus/lobby (overlays cover them elsewhere),
+// hidden in-match. Toggled alongside #xBtn (same lifecycle).
+function setCornerIcons(show){ ['socialBtn','storeBtn'].forEach(id=>{ const el=$(id); if(el) el.classList.toggle('hide', !show); }); }
 $('dailyTab').onclick=()=>{ const d=$('dailyDock'); d.classList.toggle('open'); if(d.classList.contains('open')) renderDaily(); };
 
 $('cancelMatch').onclick=cancelMatch;
@@ -2590,6 +2605,12 @@ $('selStartBtn').onclick=()=>{
 // no character/opponent select screen. Defaults to vs-CPU at the current difficulty.
 $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
   ranked=false; oppActive=true; mode='ai'; practiceOpp='cpu'; csContext='practice'; beginGame(); };   // b101: respects the lobby-selected gameMode (was hard-coded goals)
+// b107: LOCAL 2-PLAYER (two humans, one keyboard, one screen) — desktop only. Reuses the existing mode==='2p'
+// machinery; controls: P1 WASD move · Space kick · F lunge · ShiftLeft sprint | P2 Arrows move · Enter kick ·
+// / (Slash) lunge · ShiftRight sprint. Aim follows each player's facing (keyboard-only, no mouse). Respects
+// the lobby MODE selector (goals/keep-away). Hidden on touch (two people can't share a phone).
+$('local2pBtn').onclick=()=>{ if(IS_TOUCH) return; audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
+  ranked=false; oppActive=true; mode='2p'; practiceOpp='2p'; csContext='practice'; beginGame(); };
 // b90 UI REMODEL: invite slot (2v2 placeholder). Hover (desktop) reveals INVITE via CSS; tap (mobile) toggles it;
 // clicking INVITE shows a clean styled "coming with 2v2" message — no real party functionality yet.
 (function(){ const slot=$('inviteSlot'), btn=$('inviteBtn'); if(!slot) return;
@@ -3605,8 +3626,10 @@ function showMatchBanner(){
 
 // touch devices get the on-screen joystick + KICK button (the #touch layer is display:none by default)
 const IS_TOUCH = (typeof matchMedia==='function' && matchMedia('(pointer:coarse)').matches) || (typeof window!=='undefined' && 'ontouchstart' in window);
+if(IS_TOUCH){ const _l2=$('local2pBtn'); if(_l2) _l2.classList.add('hide'); }   // b107: LOCAL 2P is desktop-only (two people can't share one phone)
 function enterMatchChrome(){
   $('xBtn').classList.add('hide');                          // X link off during a match (was overlapping the scorebug)
+  setCornerIcons(false);                                    // b107: hide SOCIAL/STORE corner icons in-match
   $('touch').style.display = IS_TOUCH ? 'block' : 'none';   // show the joystick + KICK on phones
   document.body.classList.toggle('touch-match', IS_TOUCH);  // move player cards up top, free the bottom for thumbs
   const b = IS_TOUCH ? '156px' : '10px';                    // lift the POT pill above the joystick on touch
@@ -3657,7 +3680,7 @@ function gotoMenu(){
   if(netRole && NET.ws){ NET.intentionalClose=true; NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
   NET.p2pReset();                            // tear down any direct connection so the next match renegotiates
   netRole=null; gp=null; resetWager(); oppChar=null;
-  $('touch').style.display='none'; $('xBtn').classList.remove('hide');
+  $('touch').style.display='none'; $('xBtn').classList.remove('hide'); setCornerIcons(true);   // b107: restore SOCIAL/STORE corner icons on return to the lobby
   document.body.classList.remove('show-rotate'); document.body.classList.remove('touch-match');
   clearTimeout(htTimer); hideHalftime(); halftime=false;
   clearTimeout(_bannerTimer); $('matchBanner').classList.add('hide');

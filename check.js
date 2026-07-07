@@ -2248,11 +2248,9 @@ function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=S
 // above a LIVING animated character. Reads the equipped value; called on equip change + on entering the
 // lobby. Display-only (equip stays in the Locker). Null-guarded so it can never throw / dead-screen.
 function lobbyBannerFront(c){
-  const s=STATS[c];
-  const bar=(lbl,v,lo,hi)=>{ const pct=Math.max(4,Math.min(100,Math.round((v-lo)/(hi-lo)*100)));
-    return '<div class="lbStat"><span class="lbSL">'+lbl+'</span><span class="lbSB"><i style="width:'+pct+'%"></i></span><span class="lbSV">'+v+'</span></div>'; };
-  return bar('GRAB',s.grab,46,52) + bar('PACE',s.pace,0,20) + bar('DEF',s.def,0,20) + bar('STA',s.sta,0,20)
-       + bar('DRIB',s.drb,0,20) + bar('POW',s.pow,0,20) + bar('DIV',s.div,0,20);
+  // b105 MAIN-MENU card front: OFFENSE + DEFENSE as ★/5 (half-stars). Detailed stat bars live in the Locker.
+  return '<div class="lbStarRow"><span class="lbStarLbl">OFFENSE</span>'+starHTML(offStars(c))+'</div>'
+       + '<div class="lbStarRow"><span class="lbStarLbl">DEFENSE</span>'+starHTML(defStars(c))+'</div>';
 }
 function lobbyBannerBack(c){
   const r=getCharRecord(c);   // reuse the Locker card-back data/store (no rebuild)
@@ -2265,7 +2263,8 @@ function renderLobbyShowcase(){
   const c=(STATS[equippedChar]&&isOwned(equippedChar))?equippedChar:'pepe';
   const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker ore-tier styling; also resets to FRONT on equip change
   const ov=document.getElementById('lobbyOvr'); if(ov) ov.textContent=overallOf(c);
-  const tn=document.getElementById('lobbyTierName'); if(tn) tn.textContent=oreTier(c).toUpperCase();
+  const tn=document.getElementById('lobbyTierName'); if(tn) tn.textContent=tierEmoji(c);   // b105: JUST the ore emoji (no gradient)
+  const cn=document.getElementById('lobbyCardName'); if(cn) cn.textContent=STATS[c].name;   // b105: character name on the card front
   const st=document.getElementById('lobbyBannerStats'); if(st) st.innerHTML=lobbyBannerFront(c);
   const rec=document.getElementById('lobbyBannerRec'); if(rec) rec.innerHTML=lobbyBannerBack(c);
   const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
@@ -2383,7 +2382,7 @@ function laDrawBall(c2,x,y,r){
 function lobbyAnimDraw(cv){
   const c2=cv.getContext&&cv.getContext('2d'); if(!c2) return;
   const W2=cv.width, H2=cv.height; c2.clearRect(0,0,W2,H2);
-  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.34, W2*0.20);   // big head, sized to fit the roam strip
+  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.185, W2*0.095);   // b105: SHRUNK ~half (was .34/.20) so he has room to roam the pitch, not fill it
   const cutY=hy + LOBBY_GROUND_CUT*R;                   // b96 pitch line at the neck — head rises out of the pitch, follows the bob
   const lift=Math.max(0,0.50-_la.hy);                   // airborne fade for the ground contact pool
   const sa=0.30*(1-lift*1.5), sw=R*1.5*(1-lift*0.9);
@@ -2478,8 +2477,15 @@ function roundHalf(x){ return Math.max(0.5, Math.min(5, Math.round(x*2)/2)); }
 function grabStars(c){ return roundHalf(STATS[c].grab-47); }   // grab 48 -> 1.0★ ... 52 -> 5.0★ (linear)
 function holdStars(c){ return roundHalf(STATS[c].drb/4); }     // Dribbling /20 -> 1-5★
 function tackleStars(c){ return roundHalf(STATS[c].def/4); }   // Defending /20 -> 1-5★
+// b105 MAIN-MENU card: roll the 6 stats into OFFENSE / DEFENSE as /5 (half-stars allowed). OFFENSE = the
+// four attacking stats (pace, dribbling, power, diving) averaged /20 then scaled to /5; DEFENSE = defending
+// + stamina averaged /20 then scaled to /5. Display-only — no stat/overall/gameplay change.
+function offStars(c){ const s=STATS[c]; return roundHalf((s.pace+s.drb+s.pow+s.div)/16); }   // (avg of the 4 /20 stats)/4
+function defStars(c){ const s=STATS[c]; return roundHalf((s.def+s.sta)/8); }                 // (avg of the 2 /20 stats)/4
 function starHTML(r){ var h=''; for(var i=1;i<=5;i++){ var cls=r>=i?'full':(r>=i-0.5?'half':''); h+='<span class="loStar '+cls+'">★</span>'; } return '<span class="loStars">'+h+'</span>'; }
-function oreTier(c){ var o=overallOf(c); return o>=94?'netherite':o>=88?'diamond':o>=84?'gold':o>=80?'iron':'stone'; }   // cosmetic band, by OVERALL (no power)
+// b105: SIX ore bands by OVERALL /120. 🪵Wood 75-79 · 🪨Stone 80-83 · ⚙️Iron 84-87 · 👑Gold 88-90 · 💎Diamond 91-93 · 💀Netherite 94-100.
+function oreTier(c){ var o=overallOf(c); return o>=94?'netherite':o>=91?'diamond':o>=88?'gold':o>=84?'iron':o>=80?'stone':'wood'; }   // cosmetic band, by OVERALL (no power)
+function tierEmoji(c){ return ({wood:'🪵',stone:'🪨',iron:'⚙️',gold:'👑',diamond:'💎',netherite:'💀'})[oreTier(c)]||'🪵'; }   // b105: emoji-only on the main-menu card
 function lockerFrontHTML(c){ const s=STATS[c];
   const bar=(lbl,v)=>'<div class="loStat"><span class="ll">'+lbl+'</span><span class="lb"><b style="width:'+(v*5)+'%"></b></span><span class="lv">'+v+'</span></div>';
   return '<div class="loFace loFront"><div class="loEquipBadge">✓ EQUIPPED</div><i class="loSheen"></i>'

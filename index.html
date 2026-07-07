@@ -555,16 +555,20 @@
   #lockerScreen .loSlot.tier-netherite .loSheen{background:radial-gradient(120% 75% at 50% 0%,rgba(150,100,220,.28),transparent 60%)}
   #lockerScreen .loSlot.active.tier-netherite .loSheen{animation:loSmoke 3.8s ease-in-out infinite}
   @keyframes loSmoke{0%,100%{opacity:.5}50%{opacity:1}}
-  /* Stone 75-79 — matte grey, no glow */
+  /* b105 SIX ore bands (by OVERALL /120): Wood 75-79 · Stone 80-83 · Iron 84-87 · Gold 88-90 · Diamond 91-93 · Netherite 94-100 */
+  /* Wood 75-79 — matte warm timber, no glow */
+  #lockerScreen .loSlot.tier-wood .loFront{border-color:#a9855c;background:linear-gradient(165deg,#f4ece0,#e2d2bd)}
+  #lockerScreen .loSlot.tier-wood .loFront::after{background:linear-gradient(90deg,#9c7b52,#c6a97f)}
+  /* Stone 80-83 — matte grey, no glow */
   #lockerScreen .loSlot.tier-stone .loFront{border-color:#aeb4bc;background:linear-gradient(165deg,#f4f5f7,#e0e3e8)}
   #lockerScreen .loSlot.tier-stone .loFront::after{background:linear-gradient(90deg,#a7adb5,#c4c9cf)}
-  /* Iron 80-83 — brushed metal, subtle sheen */
+  /* Iron 84-87 — brushed metal, subtle sheen */
   #lockerScreen .loSlot.tier-iron .loFront{border-color:#c2c8d0;background:linear-gradient(165deg,#fdfdfe,#dde1e7);box-shadow:0 0 0 1px rgba(150,160,172,.28),var(--fc-shadow)}
   #lockerScreen .loSlot.tier-iron .loFront::after{background:linear-gradient(90deg,#aeb6c0,#eef1f5,#aeb6c0)}
-  /* Gold 84-87 — gold, warm glow + shine */
+  /* Gold 88-90 — gold, warm glow + shine */
   #lockerScreen .loSlot.tier-gold .loFront{border-color:#e7b53b;background:linear-gradient(165deg,#fffdf3,#f6e6bd);box-shadow:0 0 0 1px rgba(231,181,59,.5),0 10px 34px rgba(231,181,59,.32)}
   #lockerScreen .loSlot.tier-gold .loFront::after{background:linear-gradient(90deg,#d59a1e,#ffe492,#d59a1e)}
-  /* Diamond 88-93 — cyan crystalline, sparkle */
+  /* Diamond 91-93 — cyan crystalline, sparkle */
   #lockerScreen .loSlot.tier-diamond .loFront{border-color:#4fd0e6;background:linear-gradient(165deg,#f2feff,#cbf0f8);box-shadow:0 0 0 1px rgba(79,208,230,.55),0 10px 34px rgba(79,208,230,.36)}
   #lockerScreen .loSlot.tier-diamond .loFront::after{background:linear-gradient(90deg,#2bb6d4,#a6ecf8,#2bb6d4)}
   /* Netherite 94-100 — dark charcoal + purple, smoky animated shimmer (the special one) */
@@ -723,10 +727,10 @@
   /* ---- SHOWCASE (b93): flippable STATS BANNER above a LIVING animated character ---- */
   #lobbyStage{ grid-area:stage;align-self:center;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100% }
   #lobbyTopRow{ position:relative;display:flex;align-items:stretch;justify-content:center;gap:min(3vw,26px);width:100% }
-  #lobbyShowcase{ position:relative;flex:0 0 auto;width:min(340px,60vw);display:flex;flex-direction:column;align-items:center }
+  #lobbyShowcase{ position:relative;flex:0 0 auto;width:min(196px,44vw);display:flex;flex-direction:column;align-items:center }   /* b105: narrower card (was 340/60vw) */
 
   /* flippable card banner */
-  .lobbyCard{ position:relative;width:100%;aspect-ratio:2/1;perspective:1100px;cursor:pointer;-webkit-tap-highlight-color:transparent }
+  .lobbyCard{ position:relative;width:100%;aspect-ratio:1/1.05;perspective:1100px;cursor:pointer;-webkit-tap-highlight-color:transparent }   /* b105: narrower portrait (was 2/1) */
   #lobbyBannerFlip{ position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,.05,.2,1) }
   .lobbyCard.flip #lobbyBannerFlip{ transform:rotateY(180deg) }
   .lbFace{ position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;overflow:hidden;
@@ -737,37 +741,29 @@
     background:linear-gradient(125deg,rgba(110,215,255,.20),rgba(180,120,255,.14) 30%,transparent 48%,transparent 60%,rgba(255,220,140,.18)) }
   .lbFlipHint{ position:absolute;bottom:5px;right:10px;z-index:5;font-family:'Oswald','Arial Narrow',sans-serif;
     font-size:9px;letter-spacing:1.5px;color:var(--fc-ink2);opacity:.7;pointer-events:none }
-  /* front: OVR + tier (left) · stat bars (right) */
-  .lbFrontHead{ display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:76px;
-    border-right:1px solid var(--fc-line);padding-right:10px;z-index:2 }
+  /* b105 MAIN-MENU card FRONT — vertical stack: NAME · OVR + ore EMOJI · OFFENSE/DEFENSE ★. FIFA-clean
+     white card (tier shown as JUST the emoji — no ore gradient). Detailed stats stay in the Locker. */
+  .lbFront{ flex-direction:column;align-items:stretch;justify-content:center;gap:7px;padding:11px 12px }
+  .lbName{ text-align:center;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(15px,2.4vw,20px);
+    letter-spacing:2px;color:var(--fc-ink);z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+  .lbFrontHead{ display:flex;flex-direction:row;align-items:center;justify-content:center;gap:14px;min-width:0;border:none;padding:0;z-index:2 }
   .lbOvrWrap{ display:flex;flex-direction:column;align-items:center;line-height:.9 }
-  #lobbyOvr{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(30px,6.2vw,46px);color:var(--fc-ink) }
+  #lobbyOvr{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:clamp(30px,7vw,46px);color:var(--fc-ink) }
   .lbOvrLbl{ font-family:'Oswald','Arial Narrow',sans-serif;font-size:10px;letter-spacing:3px;color:var(--fc-ink2) }
-  .lbTierName{ margin-top:5px;font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:var(--fc-ink2) }
-  .lbStats{ flex:1;display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;align-content:center;z-index:2 }
-  .lbStat{ display:flex;align-items:center;gap:6px;font-family:'Oswald','Arial Narrow',sans-serif;font-size:10px;letter-spacing:.5px }
-  .lbStat .lbSL{ width:34px;color:var(--fc-ink2);flex:none }
-  .lbStat .lbSB{ flex:1;height:5px;border-radius:3px;background:rgba(16,36,58,.14);overflow:hidden }
-  .lbStat .lbSB i{ display:block;height:100%;background:linear-gradient(90deg,var(--fc-accent),var(--fc-accent2));border-radius:3px }
-  .lbStat .lbSV{ width:16px;text-align:right;color:var(--fc-ink);font-weight:700;flex:none }
-  /* back: your record */
+  .lbTierName{ margin:0;font-size:clamp(26px,6vw,38px);line-height:1 }        /* the ore EMOJI */
+  .lbStats{ display:flex;flex-direction:column;gap:5px;z-index:2 }
+  .lbStarRow{ display:flex;align-items:center;justify-content:space-between;gap:8px }
+  .lbStarLbl{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:1.5px;color:var(--fc-ink2) }
+  /* star icons on the lobby card (the .loStar rule is locker-scoped) */
+  #startScreen .loStars{ display:inline-flex;gap:1px }
+  #startScreen .loStar{ color:rgba(16,36,58,.16);font-size:clamp(15px,3.4vw,19px);line-height:1;position:relative }
+  #startScreen .loStar.full{ color:var(--fc-gold) }
+  #startScreen .loStar.half::before{ content:"★";position:absolute;left:0;top:0;width:50%;overflow:hidden;color:var(--fc-gold) }
+  /* back: your record — single column for the narrow card */
   .lbBackHead{ font-family:'Oswald','Arial Narrow',sans-serif;font-weight:700;font-size:11px;letter-spacing:2px;color:var(--fc-accent);text-align:center;z-index:2 }
-  .lbRec{ flex:1;display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;align-content:center;z-index:2 }
-  .lbRow{ display:flex;justify-content:space-between;gap:8px;font-family:'Oswald','Arial Narrow',sans-serif;font-size:10.5px;color:var(--fc-ink2) }
+  .lbRec{ flex:1;display:flex;flex-direction:column;gap:3px;justify-content:center;z-index:2 }
+  .lbRow{ display:flex;justify-content:space-between;gap:8px;font-family:'Oswald','Arial Narrow',sans-serif;font-size:11px;color:var(--fc-ink2) }
   .lbRow b{ color:var(--fc-ink);font-weight:700 }
-  /* ore-tier front-face styling (reuse the Locker gradients/glows) */
-  .lobbyCard.tier-stone .lbFront{ border-color:#aeb4bc;background:linear-gradient(165deg,#f4f5f7,#e0e3e8) }
-  .lobbyCard.tier-iron .lbFront{ border-color:#c2c8d0;background:linear-gradient(165deg,#fdfdfe,#dde1e7) }
-  .lobbyCard.tier-gold .lbFront{ border-color:#e7b53b;background:linear-gradient(165deg,#fffdf3,#f6e6bd) }
-  .lobbyCard.tier-gold{ filter:drop-shadow(0 10px 30px rgba(231,181,59,.4)) }
-  .lobbyCard.tier-diamond .lbFront{ border-color:#4fd0e6;background:linear-gradient(165deg,#f2feff,#cbf0f8) }
-  .lobbyCard.tier-diamond{ filter:drop-shadow(0 10px 30px rgba(79,208,230,.4)) }
-  .lobbyCard.tier-netherite .lbFront{ border-color:#7d5aa0;background:linear-gradient(165deg,#2b2536,#15121d) }
-  .lobbyCard.tier-netherite{ filter:drop-shadow(0 12px 34px rgba(120,70,170,.55)) }
-  .lobbyCard.tier-netherite .lbFront #lobbyOvr,.lobbyCard.tier-netherite .lbFront .lbOvrLbl,.lobbyCard.tier-netherite .lbFront .lbTierName{ color:#efe6ff }
-  .lobbyCard.tier-netherite .lbFront .lbStat .lbSL{ color:#c7b8e0 } .lobbyCard.tier-netherite .lbFront .lbStat .lbSV{ color:#fff }
-  .lobbyCard.tier-netherite .lbFront .lbFrontHead{ border-right-color:rgba(200,170,240,.25) }
-  .lobbyCard.tier-netherite .lbFront .lbStat .lbSB{ background:rgba(255,255,255,.16) }
 
   /* b94: FREE-ROAM pitch — the character runs across the full width here. NO box/border/background:
      the stadium backdrop shows through; a subtle ground gradient gives a floor/horizon to run along. */
@@ -865,8 +861,11 @@
     /* showcase: sized by HEIGHT (vh) so the banner + animated character fit the short row (with room to breathe) */
     #lobbyStage{ gap:6px;justify-content:center }
     #lobbyTopRow{ gap:9px;align-items:stretch }
-    #lobbyShowcase{ width:min(53vh,244px) }
+    #lobbyShowcase{ width:min(30vh,152px) }              /* b105: narrower PORTRAIT card sized by height so it fits the short landscape */
     #lobbyOvr{ font-size:clamp(22px,5.4vh,32px) }
+    .lbName{ font-size:clamp(13px,3vh,17px) }
+    .lbTierName{ font-size:clamp(22px,6vh,32px) }
+    #startScreen .loStar{ font-size:clamp(13px,3.2vh,17px) }
     .lbFrontHead{ min-width:58px;padding-right:8px }
     .lbFace{ padding:8px 11px;gap:9px }
     .lbStats{ gap:2px 8px } .lbStat{ font-size:9px } .lbStat .lbSL{ width:28px } .lbStat .lbSB{ height:4px }
@@ -909,7 +908,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b104 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b105 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1155,9 +1154,10 @@
               <div id="lobbyBannerFlip">
                 <div class="lbFace lbFront">
                   <i class="lobbySheen"></i>
+                  <div class="lbName" id="lobbyCardName">PEPE</div>
                   <div class="lbFrontHead">
                     <div class="lbOvrWrap"><span id="lobbyOvr">0</span><span class="lbOvrLbl">OVR</span></div>
-                    <div class="lbTierName" id="lobbyTierName">STONE</div>
+                    <div class="lbTierName" id="lobbyTierName">🪵</div>
                   </div>
                   <div class="lbStats" id="lobbyBannerStats"></div>
                 </div>
@@ -3716,11 +3716,9 @@ function updateLockerBtn(){ const el=$('lockerBtnName'); if(el) el.textContent=S
 // above a LIVING animated character. Reads the equipped value; called on equip change + on entering the
 // lobby. Display-only (equip stays in the Locker). Null-guarded so it can never throw / dead-screen.
 function lobbyBannerFront(c){
-  const s=STATS[c];
-  const bar=(lbl,v,lo,hi)=>{ const pct=Math.max(4,Math.min(100,Math.round((v-lo)/(hi-lo)*100)));
-    return '<div class="lbStat"><span class="lbSL">'+lbl+'</span><span class="lbSB"><i style="width:'+pct+'%"></i></span><span class="lbSV">'+v+'</span></div>'; };
-  return bar('GRAB',s.grab,46,52) + bar('PACE',s.pace,0,20) + bar('DEF',s.def,0,20) + bar('STA',s.sta,0,20)
-       + bar('DRIB',s.drb,0,20) + bar('POW',s.pow,0,20) + bar('DIV',s.div,0,20);
+  // b105 MAIN-MENU card front: OFFENSE + DEFENSE as ★/5 (half-stars). Detailed stat bars live in the Locker.
+  return '<div class="lbStarRow"><span class="lbStarLbl">OFFENSE</span>'+starHTML(offStars(c))+'</div>'
+       + '<div class="lbStarRow"><span class="lbStarLbl">DEFENSE</span>'+starHTML(defStars(c))+'</div>';
 }
 function lobbyBannerBack(c){
   const r=getCharRecord(c);   // reuse the Locker card-back data/store (no rebuild)
@@ -3733,7 +3731,8 @@ function renderLobbyShowcase(){
   const c=(STATS[equippedChar]&&isOwned(equippedChar))?equippedChar:'pepe';
   const card=document.getElementById('lobbyCard'); if(card) card.className='lobbyCard tier-'+oreTier(c);   // reuse the locker ore-tier styling; also resets to FRONT on equip change
   const ov=document.getElementById('lobbyOvr'); if(ov) ov.textContent=overallOf(c);
-  const tn=document.getElementById('lobbyTierName'); if(tn) tn.textContent=oreTier(c).toUpperCase();
+  const tn=document.getElementById('lobbyTierName'); if(tn) tn.textContent=tierEmoji(c);   // b105: JUST the ore emoji (no gradient)
+  const cn=document.getElementById('lobbyCardName'); if(cn) cn.textContent=STATS[c].name;   // b105: character name on the card front
   const st=document.getElementById('lobbyBannerStats'); if(st) st.innerHTML=lobbyBannerFront(c);
   const rec=document.getElementById('lobbyBannerRec'); if(rec) rec.innerHTML=lobbyBannerBack(c);
   const nm=document.getElementById('lobbyHeroName'); if(nm) nm.textContent=STATS[c].name;
@@ -3851,7 +3850,7 @@ function laDrawBall(c2,x,y,r){
 function lobbyAnimDraw(cv){
   const c2=cv.getContext&&cv.getContext('2d'); if(!c2) return;
   const W2=cv.width, H2=cv.height; c2.clearRect(0,0,W2,H2);
-  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.34, W2*0.20);   // big head, sized to fit the roam strip
+  const hx=_la.hx*W2, hy=_la.hy*H2, R=Math.min(H2*0.185, W2*0.095);   // b105: SHRUNK ~half (was .34/.20) so he has room to roam the pitch, not fill it
   const cutY=hy + LOBBY_GROUND_CUT*R;                   // b96 pitch line at the neck — head rises out of the pitch, follows the bob
   const lift=Math.max(0,0.50-_la.hy);                   // airborne fade for the ground contact pool
   const sa=0.30*(1-lift*1.5), sw=R*1.5*(1-lift*0.9);
@@ -3946,8 +3945,15 @@ function roundHalf(x){ return Math.max(0.5, Math.min(5, Math.round(x*2)/2)); }
 function grabStars(c){ return roundHalf(STATS[c].grab-47); }   // grab 48 -> 1.0★ ... 52 -> 5.0★ (linear)
 function holdStars(c){ return roundHalf(STATS[c].drb/4); }     // Dribbling /20 -> 1-5★
 function tackleStars(c){ return roundHalf(STATS[c].def/4); }   // Defending /20 -> 1-5★
+// b105 MAIN-MENU card: roll the 6 stats into OFFENSE / DEFENSE as /5 (half-stars allowed). OFFENSE = the
+// four attacking stats (pace, dribbling, power, diving) averaged /20 then scaled to /5; DEFENSE = defending
+// + stamina averaged /20 then scaled to /5. Display-only — no stat/overall/gameplay change.
+function offStars(c){ const s=STATS[c]; return roundHalf((s.pace+s.drb+s.pow+s.div)/16); }   // (avg of the 4 /20 stats)/4
+function defStars(c){ const s=STATS[c]; return roundHalf((s.def+s.sta)/8); }                 // (avg of the 2 /20 stats)/4
 function starHTML(r){ var h=''; for(var i=1;i<=5;i++){ var cls=r>=i?'full':(r>=i-0.5?'half':''); h+='<span class="loStar '+cls+'">★</span>'; } return '<span class="loStars">'+h+'</span>'; }
-function oreTier(c){ var o=overallOf(c); return o>=94?'netherite':o>=88?'diamond':o>=84?'gold':o>=80?'iron':'stone'; }   // cosmetic band, by OVERALL (no power)
+// b105: SIX ore bands by OVERALL /120. 🪵Wood 75-79 · 🪨Stone 80-83 · ⚙️Iron 84-87 · 👑Gold 88-90 · 💎Diamond 91-93 · 💀Netherite 94-100.
+function oreTier(c){ var o=overallOf(c); return o>=94?'netherite':o>=91?'diamond':o>=88?'gold':o>=84?'iron':o>=80?'stone':'wood'; }   // cosmetic band, by OVERALL (no power)
+function tierEmoji(c){ return ({wood:'🪵',stone:'🪨',iron:'⚙️',gold:'👑',diamond:'💎',netherite:'💀'})[oreTier(c)]||'🪵'; }   // b105: emoji-only on the main-menu card
 function lockerFrontHTML(c){ const s=STATS[c];
   const bar=(lbl,v)=>'<div class="loStat"><span class="ll">'+lbl+'</span><span class="lb"><b style="width:'+(v*5)+'%"></b></span><span class="lv">'+v+'</span></div>';
   return '<div class="loFace loFront"><div class="loEquipBadge">✓ EQUIPPED</div><i class="loSheen"></i>'

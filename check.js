@@ -1033,7 +1033,7 @@ function showCard(type,name){
 
 function endGame(who){
   state='win';
-  if(netRole==='host') sendState({st:'win', win:who});   // tell the guest the match is over
+  if(netRole==='host'){ sendState({st:'win', win:who}); NET.relay({end:who}); }   // b106: end the match for the guest via BOTH the fast DC snapshot (st:'win') AND a reliable WS control msg — the DC is {ordered:false,maxRetransmits:0}, so the snapshot alone can be dropped or overwritten by a trailing st:'play' -> guest would hang on the play screen (no rematch)
   if(ranked && account) recordResult(who==='p');   // endGame is always the local (left) player's perspective
   commitMatchStats(who);   // BUILD 2: per-character record — host commits its own + relays the guest its own (no double-count)
   document.getElementById('winScreen').classList.remove('hide');
@@ -1491,7 +1491,7 @@ function loop(ts){
       }
       updateHUD();
       // keep streaming even while frozen so the guest sees ht=1 (freeze) then ht=0 (resume)
-      if(netRole==='host'){ stateSendAcc+=dt; if(stateSendAcc>=SNAP_INTERVAL_S){ stateSendAcc-=SNAP_INTERVAL_S; if(stateSendAcc>SNAP_INTERVAL_S) stateSendAcc=0; sendState(); } }   // steady 60Hz (keep the remainder, don't reset -> less send-cadence jitter)
+      if(netRole==='host' && state==='play'){ stateSendAcc+=dt; if(stateSendAcc>=SNAP_INTERVAL_S){ stateSendAcc-=SNAP_INTERVAL_S; if(stateSendAcc>SNAP_INTERVAL_S) stateSendAcc=0; sendState(); } }   // steady 60Hz (keep the remainder, don't reset -> less send-cadence jitter). b106: re-check state==='play' so the transition frame — where endGame flipped state->win MID-frame (onTimeUp @ ~L2941 / processLunges->red @ ~L2951, both before this line) — does NOT emit a trailing st:'play' snapshot that would overwrite the guest's newest (win) snapshot. Halftime still streams (state stays 'play').
     }
     // round-trip ping for the on-screen latency readout (both roles)
     if(netRole){ pingAcc+=dt; if(pingAcc>=0.34){ pingAcc=0; NET.relay({ping:performance.now()}); }   // ~3Hz so the adaptive buffer reacts fast
@@ -2876,6 +2876,7 @@ function onRelayData(d){
     else if(d.state){ pushNetState(d.state); }          // guest buffers snapshot for smoothing
     else if(d.rematch){ onPeerRematch(); }              // friend tapped REMATCH
     else if(d.left){ peerLeft=true; greyRematch('Your friend went back to the menu.'); }
+    else if(d.end!=null){ if(netRole==='guest' && state==='play'){ state='win'; showWinFromNet(d.end); } }   // b106: reliable match-end (WS) — guarantees the guest reaches the end/rematch screen (incl. after a RED) even if the loss-tolerant DC win snapshot was dropped or reordered; idempotent with the DC path at applyNetState (both guard state==='play', so whichever lands first wins and the other is a no-op)
     else if(d.ping!=null){ NET.relay({pong:d.ping}); }   // bounce it back so the peer can measure RTT
     else if(d.pong!=null){ const rtt=Math.round(performance.now()-d.pong);
       // DISPLAY (b80): honest, lightly + SYMMETRICALLY smoothed actual RTT — what the pill shows.

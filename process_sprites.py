@@ -11,12 +11,22 @@ character is "molded" to the same size and position in the game.
 How alignment works:
 - Background removal is a FLOOD-FILL from the border with a TIGHT threshold (THRESH3) that stops
   at the character's skin, so pale/white wojak faces are NOT erased (they used to go invisible).
-- Each face is measured: the widest head row (cheeks/ears) gives FACE WIDTH and centre; the row
-  below it where the silhouette narrows to the neck gives the CHIN.
-- Every character is then SCALED so its face width is identical, the CHIN is anchored to the same
-  line, and the face is horizontally centred — all on one fixed canvas. So in-game (where drawPlayer
-  height-locks the sprite) every face is the same size, with chins and eye-lines lined up. Hair/ears
-  extend naturally above; the body below the chin is dropped.
+- Each face is measured: the widest head row (cheeks/ears) gives FACE WIDTH and centre.
+- Every character is SCALED so its face width is identical and the FACE CENTRE is anchored to the
+  same line (FACE_CYF), horizontally centred — all on one fixed canvas. So in-game (drawPlayer /
+  drawHero read the face at FACE_CYF and size by the face) every face is the same size and aligned.
+
+b108 — CLEAN NECK/JAW CUT (source-level, applied everywhere):
+- The head is cut at a fixed fraction of the (normalised) FACE WIDTH *below the widest face row*
+  (JAW_K), NOT by the old jaw-narrowing detection. That detection failed on suit portraits
+  (grandpa/elon/oldwoj/pdidpe/obampe) whose shoulders never narrow -> shoulders got baked in and the
+  face was mis-sized. A fixed fraction lands the neck consistently and always sits ABOVE the
+  shoulders, for round meme heads AND suit heads alike.
+- The lower edge is FEATHERED (alpha ramped to 0 over the bottom FEATHER_FRAC of the head) so the cut
+  is a soft neck fade, never a hard horizontal chop.
+- JAW_K ~0.42 also places the neck near CHIN_FRAC and the face centre at FACE_CYF, matching the draw
+  code, so this changes NO in-game hitbox/grab (those are separate from the sprite image) and keeps
+  the face size/alignment the earlier builds established.
 """
 from PIL import Image
 from collections import deque
@@ -32,14 +42,32 @@ ALPHA = 40          # alpha above this counts as opaque when measuring the silho
 # --- fixed output frame: FACE normalised into this so every FACE reads the same SIZE in-game ---
 CANVAS_W = 360      # frame width
 CANVAS_H = 450      # frame height
-CHIN_FRAC = 0.84    # the chin sits this far down the frame for EVERY character
+FACE_CYF = 0.62     # the FACE CENTRE sits this far down the frame for EVERY character (matches drawPlayer FACE_CYF)
+CHIN_FRAC = 0.84    # reference chin line (drawHero anchors here); neck lands ~here at the default JAW_K
 # b58: normalise by FACE WIDTH (cheek-to-cheek) — the size the eye actually reads — NOT total bbox height.
-# Hair/ears then extend naturally above, so overall silhouette HEIGHT varies by hairstyle (correct & natural).
-FACE_W      = 240   # every character's cheek/face width scaled to this many px (the perceived size)
+FACE_W      = 240   # every character's cheek/face width scaled to this many px (the perceived size) — UNCHANGED
 TOP_MARGIN  = 10    # min clear px above the hair — vertical-fit safety so tall hair can't clip the frame top
 SIDE_MARGIN = 14    # min clear px each side
-# per-char chin fraction (of silhouette top..bot) where the auto jaw-detect misreads (3/4 views) — KEEP (b57 fix):
-CHIN_OVERRIDE = {'okeyjak': 0.88}   # okeyjak's bald cranium fools the jaw-narrowing test -> chin was cut at the mouth
+
+# b108: NECK/JAW CUT — cut this many face-widths BELOW the widest face row, then feather. ~0.42 puts the
+# neck at ~CHIN_FRAC with the face centre at FACE_CYF (self-consistent with the draw code) and always
+# sits above the shoulders. Per-char overrides for portraits whose widest row isn't the cheeks (bald
+# cranium reads high -> cut LOWER; wide hair reads low -> cut a touch higher). Tuned via the contact sheet.
+JAW_K_DEFAULT = 0.42
+JAW_K = {
+    'okeyjak': 0.40,   # bald cranium reads WIDE (big faceW) -> a small fraction already reaches the jaw
+    'boomer':  0.50,   # round bald pate reads high
+    'grandpa': 0.50,
+    'oldwoj':  0.50,
+    'elon':    0.46,
+    'soyjak':  0.37,   # keep the curly neckbeard (facial hair) but trim the bare shoulders below it
+    'wojak':   0.46,
+    'doomer':  0.40,   # deliberately scribbly dark-hood character (faithful to the source art)
+    'pepe':    0.26,   # cut at the green jaw base, ABOVE the blue shirt (keeps the droopy mouth)
+    'trumpe':  0.40,
+}
+FEATHER_FRAC = 0.14   # fraction of head height (hair-top..cut) faded to transparent at the neck (soft edge)
+
 # face-width misread nudges (bald cranium / 3-4 view over- or under-measure the cheek row): >1 bigger, <1 smaller
 ADJUST = {'boomer': 0.85, 'okeyjak': 1.20, 'pdidpe': 0.88}
 
@@ -72,7 +100,7 @@ def remove_bg(im):
     return bg
 
 def face_metrics(im):
-    """Measure top (hair), chin, face width and horizontal centre from the silhouette."""
+    """Measure top (hair), widest face row (ymax), face width and horizontal centre from the silhouette."""
     px = im.load(); w, h = im.size
     widths = [sum(1 for x in range(w) if px[x, y][3] > ALPHA) for y in range(h)]
     nz = [y for y in range(h) if widths[y] > 0]
@@ -83,12 +111,18 @@ def face_metrics(im):
     faceW = widths[ymax]
     row = [x for x in range(w) if px[x, ymax][3] > ALPHA]
     cx = (row[0] + row[-1]) // 2 if row else w // 2
-    # chin = first row below the widest where the jaw narrows toward the neck (<66% of face width)
-    chin = bot
-    for y in range(ymax + 1, bot + 1):
-        if widths[y] < faceW * 0.66:
-            chin = min(bot, y + int(faceW * 0.04)); break   # small fixed margin past the jaw
-    return dict(top=top, chin=chin, cx=cx, faceW=faceW, bot=bot, widths=widths)
+    return dict(top=top, cx=cx, faceW=faceW, bot=bot, ymax=ymax, widths=widths)
+
+def feather_edge(im, fpx):
+    """Ramp alpha to 0 over the bottom `fpx` rows so the neck cut fades softly (no hard horizontal edge)."""
+    if fpx <= 0: return
+    px = im.load(); w, h = im.size; fpx = min(fpx, h)
+    for i in range(fpx):
+        y = h - 1 - i
+        k = i / float(fpx)            # bottom row -> 0 (fully faded), top of the band -> ~1 (untouched)
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a: px[x, y] = (r, g, b, int(a * k))
 
 def cut(name):
     src = root / (name + '.png')
@@ -101,28 +135,34 @@ def cut(name):
     m = face_metrics(im)
     if not m:
         print('skip', name, '— empty after bg removal'); return
-    top, bot, widths, faceW = m['top'], m['bot'], m['widths'], m['faceW']
-    # chin: per-char fraction override where the auto jaw-detect misreads, else the detected jaw (KEEP b57 fix)
-    chin = round(top + (bot-top)*CHIN_OVERRIDE[name]) if name in CHIN_OVERRIDE else m['chin']
-    chin = max(top+1, min(bot, chin))
-    # scale so the FACE WIDTH is uniform -> consistent PERCEIVED size (hair height then varies, which is fine)
+    top, bot, faceW, ymax = m['top'], m['bot'], m['faceW'], m['ymax']
+    # NECK/JAW CUT: a fixed fraction of the face width below the widest face row (excludes shoulders).
+    jk = JAW_K.get(name, JAW_K_DEFAULT)
+    cutRow = max(ymax + 2, min(bot, ymax + round(jk * faceW)))
+    # scale so the FACE WIDTH is uniform -> consistent PERCEIVED size (unchanged normalisation)
     s = (FACE_W * ADJUST.get(name, 1.0)) / max(1, faceW)
-    chinY = int(CANVAS_H * CHIN_FRAC)
-    if (chin - top) * s > chinY - TOP_MARGIN:                   # vertical-fit safety: tall hair can't clip the top
-        s = (chinY - TOP_MARGIN) / (chin - top)
+    # vertical-fit safety: keep the hair-top within the frame above the FACE-CENTRE anchor
+    max_above = CANVAS_H * FACE_CYF - TOP_MARGIN
+    if (ymax - top) * s > max_above:
+        s = max_above / max(1, (ymax - top))
     scaled = im.resize((max(1, round(im.width*s)), max(1, round(im.height*s))), Image.LANCZOS)
-    top_s, chin_s = round(top*s), round(chin*s)
-    face = scaled.crop((0, top_s, scaled.width, chin_s))        # hair-top down to the chin, full width
+    top_s, cut_s, ymax_s = round(top*s), round(cutRow*s), round(ymax*s)
+    face = scaled.crop((0, top_s, scaled.width, cut_s))          # hair-top down to the neck cut, full width
     fb = face.getbbox()
-    if fb: face = face.crop((fb[0], 0, fb[2], face.height))     # tighten horizontally (keep full top..chin)
-    if face.width > CANVAS_W - 2*SIDE_MARGIN:                   # side-fit safety (rarely triggers; width is normalised)
+    if fb: face = face.crop((fb[0], 0, fb[2], face.height))      # tighten horizontally (keep full top..cut)
+    face_cy = ymax_s - top_s                                     # face-centre row within the crop
+    if face.width > CANVAS_W - 2*SIDE_MARGIN:                    # side-fit safety (rarely triggers now)
         f2 = (CANVAS_W - 2*SIDE_MARGIN) / face.width
         face = face.resize((CANVAS_W - 2*SIDE_MARGIN, max(1, round(face.height*f2))), Image.LANCZOS)
+        face_cy = round(face_cy * f2)
+    feather_edge(face, max(8, round(FEATHER_FRAC * face.height)))
     canvas = Image.new('RGBA', (CANVAS_W, CANVAS_H), (0, 0, 0, 0))
-    canvas.alpha_composite(face, ((CANVAS_W - face.width)//2, chinY - face.height))   # centre face, chin on the line
+    yoff = round(CANVAS_H * FACE_CYF - face_cy)                  # anchor the FACE CENTRE at FACE_CYF
+    canvas.alpha_composite(face, ((CANVAS_W - face.width)//2, yoff))
     out = root / OUT.get(name, name + '_cut.png')
     canvas.save(out, optimize=True)
-    print('cut', name, '->', out.name, f'faceW {faceW}->{round(faceW*s)}', f'headH={face.height}', f'{out.stat().st_size//1024}KB')
+    print('cut', name, '->', out.name, f'faceW {faceW}->{round(faceW*s)}',
+          f'jaw@{jk:.2f}', f'headH={face.height}', f'yoff={yoff}', f'{out.stat().st_size//1024}KB')
 
 for n in NAMES:
     cut(n)

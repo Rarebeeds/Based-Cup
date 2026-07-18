@@ -1,0 +1,159 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Based Cup — Sprite Alignment</title>
+<style>
+  :root{--bg:#0e1512;--panel:#16201b;--line:#26332b;--accent:#4fae6e;--ink:#eafaf0;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,sans-serif}
+  header{padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;letter-spacing:.5px}
+  header .hint{opacity:.7;font-size:12px}
+  .wrap{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .chars{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .chars button{background:#1d2a22;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 9px;cursor:pointer;font-size:12px}
+  .chars button.on{background:var(--accent);color:#06140d;border-color:var(--accent);font-weight:700}
+  .chars button.edited{outline:2px solid #d29a3b}
+  label.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0 4px}
+  label.row b{font-weight:600}
+  label.row span{font-variant-numeric:tabular-nums;opacity:.85}
+  input[type=range]{width:100%}
+  .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btns button{background:#1d2a22;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .btns button.primary{background:var(--accent);color:#06140d;font-weight:700;border-color:var(--accent)}
+  canvas{background:
+     repeating-conic-gradient(#20302a 0% 25%, #1a2620 0% 50%) 0 0/24px 24px;border-radius:10px;display:block}
+  #focus{width:100%;max-width:380px}
+  .grid-wrap{margin-top:14px}
+  textarea{width:100%;height:150px;background:#0b120f;color:#9be7b4;border:1px solid var(--line);border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,monospace;resize:vertical}
+  .legend{font-size:11px;opacity:.7;margin-top:6px}
+  .accent{color:var(--accent)}
+</style></head>
+<body>
+<header>
+  <h1>🎯 Based Cup — Sprite Alignment</h1>
+  <span class="hint">Load via the dev server (localhost:8099/align.html). Tune each head, then <b>Copy export</b> and paste it back to Claude.</span>
+</header>
+<div class="wrap">
+  <div>
+    <div class="card">
+      <div class="chars" id="chars"></div>
+      <div id="editor">
+        <label class="row"><b>Scale</b> <span id="sVal">1.00</span></label>
+        <input type="range" id="sRange" min="0.70" max="1.30" step="0.01" value="1.00">
+        <label class="row"><b>Vertical (dy, sprite-px)</b> <span id="dyVal">0</span></label>
+        <input type="range" id="dyRange" min="-60" max="60" step="1" value="0">
+        <label class="row"><b>Horizontal (dx, sprite-px)</b> <span id="dxVal">0</span></label>
+        <input type="range" id="dxRange" min="-40" max="40" step="1" value="0">
+        <div class="btns">
+          <button id="resetOne">Reset this char</button>
+          <button id="resetAll">Reset all</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <b>Export</b> <span class="legend">— per-char {s, dx, dy}; s=scale, dx/dy in sprite-frame px (360×450)</span>
+      <div class="btns"><button class="primary" id="copyBtn">Copy export</button></div>
+      <textarea id="exportBox" readonly></textarea>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <b>Focus — <span class="accent" id="focusName">pepe</span></b>
+      <span class="legend">blue = face-centre line (0.62) · orange = chin/neck (0.84) · green ring = target face width · ghost = pepe for size compare</span>
+      <canvas id="focus" width="380" height="470" style="margin-top:8px"></canvas>
+    </div>
+    <div class="card grid-wrap">
+      <b>All 14 — shared baseline & size ring</b> <span class="legend">(spot the odd one out, then fix it in Focus)</span>
+      <canvas id="grid" width="1040" height="480" style="width:100%;margin-top:8px"></canvas>
+    </div>
+  </div>
+</div>
+<script>
+// draw constants — MATCH the in-game sprite math so what you see = what you get
+const FACE_RF=0.278, FACE_CYF=0.62, FACE_FIT=1.15, CHIN_FRAC=0.84;
+const ROSTER=['pepe','trumpe','boomer','chad','grandpa','elon','obampe','okeyjak','oldwoj','pdidpe','sadjak','soyjak','wojak','doomer'];
+const FILE=c=>(c==='pepe'?'pepe_cut_s.png':c==='trumpe'?'trumpe_cut_s.png':c+'_cut.png');
+const LS='basedcup_sprite_align_v1';
+const imgs={}; let loaded=0;
+const adj = JSON.parse(localStorage.getItem(LS)||'{}');   // {char:{s,dx,dy}}
+const getA=c=>Object.assign({s:1,dx:0,dy:0}, adj[c]||{});
+let cur='pepe';
+
+ROSTER.forEach(c=>{ const im=new Image(); im.onload=()=>{loaded++; drawAll();}; im.onerror=()=>{loaded++;}; im.src=FILE(c)+'?t='+Date.now(); imgs[c]=im; });
+
+// draw one head into ctx at (cx, faceLineY) with a display face-radius R, applying per-char adjust
+function drawHead(ctx, c, cx, faceLineY, R, a, ghost){
+  const im=imgs[c]; if(!im||!im.complete||!im.naturalWidth) return;
+  const iw=im.naturalWidth, ih=im.naturalHeight;
+  const sBase=(R*FACE_FIT)/(iw*FACE_RF);          // in-game base draw scale
+  const s=sBase*(a.s||1);
+  const dxpx=(a.dx||0)*sBase, dypx=(a.dy||0)*sBase;  // dx/dy are sprite-frame px (360×450) -> display via base scale (EXACT game mapping)
+  ctx.save();
+  ctx.globalAlpha = ghost?0.18:1;
+  ctx.translate(cx+dxpx, faceLineY+dypx);
+  ctx.drawImage(im, -iw*0.5*s, -ih*FACE_CYF*s, iw*s, ih*s);
+  ctx.restore();
+}
+
+function drawFocus(){
+  const cv=document.getElementById('focus'), ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cx=cv.width/2, R=70, faceLineY=cv.height*FACE_CYF;
+  // ghost pepe (size reference) behind
+  if(cur!=='pepe') drawHead(ctx,'pepe',cx,faceLineY,R,getA('pepe'),true);
+  drawHead(ctx,cur,cx,faceLineY,R,getA(cur),false);
+  // reference lines
+  ctx.save();
+  ctx.strokeStyle='rgba(80,180,255,.55)'; ctx.beginPath(); ctx.moveTo(0,faceLineY); ctx.lineTo(cv.width,faceLineY); ctx.stroke();
+  const chinY=faceLineY+(CHIN_FRAC-FACE_CYF)*(R*FACE_FIT/FACE_RF); // approx chin position at this R
+  ctx.strokeStyle='rgba(255,140,80,.5)'; ctx.beginPath(); ctx.moveTo(0,chinY); ctx.lineTo(cv.width,chinY); ctx.stroke();
+  ctx.strokeStyle='rgba(120,120,130,.4)'; ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,cv.height); ctx.stroke();
+  // target face-width ring (green) — every head's cheeks should ~touch it
+  ctx.strokeStyle='rgba(79,174,110,.7)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(cx,faceLineY,R*FACE_FIT,0,7); ctx.stroke();
+  ctx.restore();
+}
+
+function drawGrid(){
+  const cv=document.getElementById('grid'), ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const cols=7, rows=2, cw=cv.width/cols, ch=cv.height/rows, R=42;
+  ROSTER.forEach((c,i)=>{
+    const col=i%cols, row=(i/cols)|0, cx=col*cw+cw/2, faceLineY=row*ch+ch*0.52;
+    ctx.save(); ctx.strokeStyle='rgba(80,180,255,.35)'; ctx.beginPath(); ctx.moveTo(col*cw,faceLineY); ctx.lineTo(col*cw+cw,faceLineY); ctx.stroke();
+    ctx.strokeStyle='rgba(79,174,110,.4)'; ctx.beginPath(); ctx.arc(cx,faceLineY,R*FACE_FIT,0,7); ctx.stroke(); ctx.restore();
+    drawHead(ctx,c,cx,faceLineY,R,getA(c),false);
+    ctx.save(); ctx.fillStyle=(c===cur?'#4fae6e':'#8aa'); ctx.font=(c===cur?'700 ':'')+'12px system-ui'; ctx.textAlign='center';
+    ctx.fillText(c, cx, row*ch+ch-8); ctx.restore();
+  });
+}
+
+function drawAll(){ drawFocus(); drawGrid(); }
+
+function refreshChars(){
+  const box=document.getElementById('chars'); box.innerHTML='';
+  ROSTER.forEach(c=>{ const b=document.createElement('button'); b.textContent=c;
+    if(c===cur)b.className='on'; if(adj[c]&&(adj[c].s!==1||adj[c].dx||adj[c].dy))b.classList.add('edited');
+    b.onclick=()=>{cur=c; syncEditor(); refreshChars(); drawAll();}; box.appendChild(b); });
+  document.getElementById('focusName').textContent=cur;
+}
+function syncEditor(){
+  const a=getA(cur);
+  document.getElementById('sRange').value=a.s; document.getElementById('sVal').textContent=(+a.s).toFixed(2);
+  document.getElementById('dyRange').value=a.dy; document.getElementById('dyVal').textContent=a.dy;
+  document.getElementById('dxRange').value=a.dx; document.getElementById('dxVal').textContent=a.dx;
+}
+function setA(k,v){ adj[cur]=Object.assign(getA(cur),{[k]:v}); localStorage.setItem(LS,JSON.stringify(adj)); updateExport(); refreshChars(); drawAll(); }
+document.getElementById('sRange').oninput=e=>{document.getElementById('sVal').textContent=(+e.target.value).toFixed(2); setA('s',+e.target.value);};
+document.getElementById('dyRange').oninput=e=>{document.getElementById('dyVal').textContent=e.target.value; setA('dy',+e.target.value);};
+document.getElementById('dxRange').oninput=e=>{document.getElementById('dxVal').textContent=e.target.value; setA('dx',+e.target.value);};
+document.getElementById('resetOne').onclick=()=>{delete adj[cur]; localStorage.setItem(LS,JSON.stringify(adj)); syncEditor(); updateExport(); refreshChars(); drawAll();};
+document.getElementById('resetAll').onclick=()=>{for(const k in adj)delete adj[k]; localStorage.setItem(LS,JSON.stringify(adj)); syncEditor(); updateExport(); refreshChars(); drawAll();};
+function updateExport(){
+  const out={}; ROSTER.forEach(c=>{ const a=getA(c); if(a.s!==1||a.dx||a.dy) out[c]={s:+(+a.s).toFixed(2),dx:a.dx|0,dy:a.dy|0}; });
+  document.getElementById('exportBox').value='SPRITE_ALIGN = '+JSON.stringify(out,null,2)+';';
+}
+document.getElementById('copyBtn').onclick=()=>{const t=document.getElementById('exportBox'); t.select(); document.execCommand('copy'); document.getElementById('copyBtn').textContent='Copied ✓'; setTimeout(()=>document.getElementById('copyBtn').textContent='Copy export',1200);};
+
+refreshChars(); syncEditor(); updateExport(); drawAll();
+</script>
+</body></html>

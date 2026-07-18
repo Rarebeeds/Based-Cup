@@ -78,6 +78,12 @@ const PLAYER_R=24, SPRITE_H=62;   // ~20% smaller; both players the SAME size
 const FACE_RF=0.278, FACE_CYF=0.62, FACE_FIT=1.15, CHIN_FRAC_DRAW=0.84;
 const SP_SCALE={pepe:1.0, trumpe:1.0, doomer:1.0, boomer:1.0, grandpa:1.0, soyjak:1.0, elon:1.0,
   obampe:1.0, okeyjak:1.0, oldwoj:1.0, pdidpe:1.0, sadjak:1.0, wojak:1.0, chad:1.0};
+// b109: per-character VISUAL alignment nudges (from align.html). {s:scale mult, dx/dy: sprite-frame px
+// (360×450) applied via the base draw scale}. EMPTY = no-op (identical draw). Applied in drawPlayer
+// (in-match), drawHero (menu/title) and laDrawHead (lobby) via spriteAdj()/applied offsets — VISUAL ONLY,
+// never touches the hitbox/grab (those are pl.x/pl.y + PLAYER_R, independent of the sprite image).
+const SPRITE_ALIGN={};
+function spriteAdj(c){ const a=SPRITE_ALIGN[c]; return a?{s:a.s||1,dx:a.dx||0,dy:a.dy||0}:{s:1,dx:0,dy:0}; }
 // 6-stat model (Phase 2, b55). Each char totals 36 (equal budget, lopsided spread → archetypes).
 // onball/offball = move speed with/without the ball; power = shot charge; defense = steal contest + closing
 // bonus; dribble = ball retention; stamina = sprint endurance. Pace (display) = onball+offball.
@@ -1438,12 +1444,12 @@ function drawPlayer(pl,img,col){
   let headTop=pl.y-R*2;
   if(img.complete && img.naturalWidth){
     const iw=img.naturalWidth, ih=img.naturalHeight;
-    const s=(R*FACE_FIT)/(iw*FACE_RF), w=iw*s, h=ih*s;
-    headTop=pl.y - ih*FACE_CYF*s;
+    const a=spriteAdj(pl.char), sBase=(R*FACE_FIT)/(iw*FACE_RF), s=sBase*a.s, w=iw*s, h=ih*s;   // b109: per-char visual align nudge (empty=no-op)
+    headTop=pl.y - ih*FACE_CYF*s + a.dy*sBase;
     ctx.save();
     ctx.translate(pl.x,pl.y);
     if(pl.face<0)ctx.scale(-1,1);
-    ctx.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,w,h);
+    ctx.drawImage(img,-iw*0.5*s + a.dx*sBase,-ih*FACE_CYF*s + a.dy*sBase,w,h);
     ctx.restore();
   }
   // charge / power bar above the head while winding up a kick
@@ -2370,12 +2376,13 @@ function lobbyAnimStep(dt){
   const vx=_la.hx-prevX;                                  // face the way he's running (dribble/jog); forward otherwise
   if((M==='dribble'||M==='jog') && Math.abs(vx)>0.0006) _la.face = vx>0?1:-1; else if(M!=='dribble'&&M!=='jog') _la.face=1;
 }
-function laDrawHead(c2,img,x,y,rot,face,R){
+function laDrawHead(c2,img,x,y,rot,face,R,charKey){
   if(!(img&&img.complete&&img.naturalWidth)) return;
-  const iw=img.naturalWidth, ih=img.naturalHeight, s=(R*FACE_FIT)/(iw*FACE_RF);
+  const iw=img.naturalWidth, ih=img.naturalHeight;
+  const a=spriteAdj(charKey), sBase=(R*FACE_FIT)/(iw*FACE_RF), s=sBase*a.s;   // b109: per-char visual align nudge (empty=no-op)
   c2.save();
   c2.translate(x,y); c2.rotate(rot); if(face<0)c2.scale(-1,1);
-  c2.drawImage(img,-iw*0.5*s,-ih*FACE_CYF*s,iw*s,ih*s);   // b108: source sprite is already a clean neck-cut + feathered head — no ground-line clip/mask
+  c2.drawImage(img,-iw*0.5*s + a.dx*sBase,-ih*FACE_CYF*s + a.dy*sBase,iw*s,ih*s);   // b108: clean neck-cut + feathered head, no clip; b109: + align nudge
   c2.restore();
 }
 function laDrawBall(c2,x,y,r){
@@ -2392,7 +2399,7 @@ function lobbyAnimDraw(cv){
   const sa=0.30*(1-lift*1.5), sw=R*1.5*(1-lift*0.9);
   if(sa>0.02){ c2.save(); c2.globalAlpha=sa; c2.fillStyle='#06140d';
     c2.beginPath(); c2.ellipse(hx, poolY, Math.max(6,sw), Math.max(3,R*0.20), 0,0,7); c2.fill(); c2.restore(); }
-  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R);
+  laDrawHead(c2,_la.img,hx,hy,_la.hrot,_la.face,R,_la.char);
   if(_la.bshow) laDrawBall(c2, _la.bx*W2, _la.by*H2, R*0.32);
 }
 let _inviteMsgT=null;

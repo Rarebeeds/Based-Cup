@@ -17,6 +17,8 @@
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
   #stage{position:relative;width:100%;height:100%;max-width:1100px}
   canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  /* b110: WIDE (2v2) pitch — letterbox the wider buffer so it keeps its aspect (no horizontal squish) under the stretch-to-fill layout */
+  body.pitch-wide #cv{object-fit:contain;background:#06140d}
   /* HUD — broadcast scorebug */
   #hud{position:absolute;top:12px;left:50%;transform:translateX(-50%);
     display:flex;align-items:stretch;z-index:5;
@@ -919,7 +921,7 @@
       <button id="chDecline" class="btn ghost">DECLINE</button></div>
     <div class="chBar"><i id="chBarFill"></i></div>
   </div>
-  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b111 ✓</div>
+  <div id="verBadge" style="position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.28);z-index:60;pointer-events:none;font-family:sans-serif">build: based-cup b112 ✓</div>
   <div id="potTag" class="hide" style="position:absolute;bottom:10px;left:50%;transform:translateX(-104%);font-size:12px;font-weight:bold;color:#ffd43b;z-index:60;pointer-events:none;font-family:sans-serif;background:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px"></div>
   <div id="liveCountHud" class="hide" style="position:absolute;top:12px;left:12px;z-index:55;font-size:11px;font-weight:bold;color:#9bf6a8;font-family:sans-serif;background:rgba(10,20,34,.75);padding:3px 9px;border-radius:8px;pointer-events:none">👁 —</div>
 
@@ -1544,11 +1546,19 @@ const WOJAK_SRC  ="data:image/png;base64,__WOJAK__";
 const CHAD_SRC   ="data:image/png;base64,__CHAD__";
 
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-// Logical playfield
-const W=1060,H=650, PAD=14, CORNER=90;
+// Logical playfield. b110: W is mode-dependent (2v2 uses a WIDER pitch — more midfield for att/def halves;
+// speed unchanged so it plays more positionally). 1v1 stays 1060. applyPitch() sets W + rebuilds FIELD.
+let W=1060; const H=650, PAD=14, CORNER=90, W_1V1=1060, W_2V2=1960;
 const GOAL_H=200;                 // goal mouth height
 const GOAL_DEPTH=44;              // net depth (deeper so you see the ball go in)
-const FIELD={l:PAD,r:W-PAD,t:PAD,b:H-PAD};
+let FIELD={l:PAD,r:W-PAD,t:PAD,b:H-PAD};   // b110: let (rebuilt by applyPitch when the pitch width changes)
+// b110: set the pitch width for the current mode, rebuild FIELD + re-fit the canvas buffer. Called at match
+// start (newGame) and on return to the menu. 2v2 = wide; everything else = 1060 (byte-identical to before).
+function applyPitch(){
+  const nw = (mode==='2v2') ? W_2V2 : W_1V1;
+  if(W!==nw){ W=nw; FIELD={l:PAD,r:W-PAD,t:PAD,b:H-PAD}; camFocusX=W/2; camFocusY=H/2; if(typeof resize==='function') resize(); }
+  if(typeof document!=='undefined' && document.body) document.body.classList.toggle('pitch-wide', mode==='2v2');   // letterbox the wide buffer so it isn't stretched
+}
 const GY0=H/2-GOAL_H/2, GY1=H/2+GOAL_H/2;
 const PLAYER_R=24, SPRITE_H=62;   // ~20% smaller; both players the SAME size
 // Head-soccer framing: every sprite is a normalised 360x450 frame with the face centred, chin at
@@ -1793,6 +1803,7 @@ function reset(concededBy){
 function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; timeLeft=matchLen(); golden=false;
   clearTimeout(htTimer); hideHalftime();
   if(mode==='2v2') pick2v2Chars();   // b110: assign teammate + 2 opponents once for this match (before reset spawns them)
+  applyPitch();                       // b110: set the pitch width for this mode BEFORE reset() places players on it
   setMeta(''); updateHUD(); reset(); goalLock=0;
   allPlayers().forEach(p=>{ p.cards=0; p.out=false; });   // b110: fresh card/out for ALL players (1v1: p+t, identical)
   goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
@@ -1855,6 +1866,11 @@ addEventListener('keyup',e=>{ if(typeof e.key!=='string') return; keys[e.key.toL
 // mouse: aim toward cursor, left-click kicks
 const mouse={x:W/2,y:H/2,active:false};
 function toLogical(e){const r=cv.getBoundingClientRect();
+  if(document.body.classList.contains('pitch-wide')){   // b110: object-fit:contain letterbox — map through the fitted content box, not the full element
+    const elAsp=r.width/r.height, bufAsp=W/H; let cw=r.width, ch=r.height, ox=0, oy=0;
+    if(bufAsp>elAsp){ ch=r.width/bufAsp; oy=(r.height-ch)/2; } else { cw=r.height*bufAsp; ox=(r.width-cw)/2; }
+    return {x:(e.clientX-r.left-ox)/cw*W, y:(e.clientY-r.top-oy)/ch*H};
+  }
   return {x:(e.clientX-r.left)/r.width*W, y:(e.clientY-r.top)/r.height*H};}
 cv.addEventListener('mousemove',e=>{const p=toLogical(e);mouse.x=p.x;mouse.y=p.y;mouse.active=true;});
 cv.addEventListener('mouseenter',()=>{mouse.active=true;});
@@ -5282,6 +5298,8 @@ function gotoMenu(){
   if(netRole && NET.ws){ NET.intentionalClose=true; NET.send({t:'leave'}); try{NET.ws.close();}catch(e){} }
   NET.p2pReset();                            // tear down any direct connection so the next match renegotiates
   netRole=null; gp=null; resetWager(); oppChar=null;
+  if(W!==W_1V1){ W=W_1V1; FIELD={l:PAD,r:W-PAD,t:PAD,b:H-PAD}; camFocusX=W/2; camFocusY=H/2; resize(); }   // b110: restore normal pitch width for the menu/next 1v1
+  document.body.classList.remove('pitch-wide');
   $('touch').style.display='none'; $('xBtn').classList.remove('hide'); setCornerIcons(true);   // b107: restore SOCIAL/STORE corner icons on return to the lobby
   document.body.classList.remove('show-rotate'); document.body.classList.remove('touch-match');
   clearTimeout(htTimer); hideHalftime(); halftime=false;

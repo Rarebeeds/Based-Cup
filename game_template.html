@@ -2071,6 +2071,7 @@ const CORN=[[FIELD.l+CORNER,FIELD.t+CORNER,-1,-1],[FIELD.r-CORNER,FIELD.t+CORNER
 function confineRound(o,r){
   o.x=clamp(o.x,FIELD.l+r,FIELD.r-r);
   o.y=clamp(o.y,FIELD.t+r,FIELD.b-r);
+  if(o.role==='def'){ o.x = o.team==='p' ? Math.min(o.x, W/2 - r) : Math.max(o.x, W/2 + r); }   // b110: DEFENDER hard-locked to own half (role null in 1v1 -> no-op)
   for(const c of CORN){
     const cx=c[0],cy=c[1];
     if((c[2]<0?o.x<cx:o.x>cx) && (c[3]<0?o.y<cy:o.y>cy)){
@@ -2320,7 +2321,7 @@ function otherTeam(team){ return team==='p'?'t':'p'; }                   // 1v1 
 // run every authoritative frame: did any lunging player make contact? (host/local only — a foul rebuilds players)
 function processLunges(){
   if(!players) return;
-  const list=[players.p]; if(oppActive) list.push(players.t);
+  const list = mode==='2v2' ? allPlayers() : (oppActive?[players.p,players.t]:[players.p]);
   for(const pl of list){
     if(pl && pl.lunging>0 && !pl.lungeFoulDone){ if(checkLungeFoul(pl)) return; }
   }
@@ -2328,7 +2329,9 @@ function processLunges(){
 // at contact: more PLAYER than BALL = foul on the lunger; reaching the BALL first = a clean, legal win.
 function checkLungeFoul(pl){
   if(!oppActive || pl.out) return false;
-  const opp=players[pl.who==='p'?'t':'p'];
+  let opp;
+  if(mode==='2v2'){ let bd=1e9; for(const q of allPlayers()){ if(q.out||q.team===pl.team) continue; const d=Math.hypot(pl.x-q.x,pl.y-q.y); if(d<bd){bd=d;opp=q;} } }   // b110: nearest opponent
+  else opp=players[pl.who==='p'?'t':'p'];
   if(!opp || opp.out) return false;
   const dOpp=Math.hypot(pl.x-opp.x, pl.y-opp.y);
   const dBall=Math.hypot(pl.x-ball.x, pl.y-ball.y);
@@ -2363,13 +2366,13 @@ function issueFoul(lunger, fouled){
     }
     // (2v2 later: team still has players -> match continues; fall through to the foul reset below.)
   }
-  foulReset(fouled.who);               // foul that doesn't end the match: kickoff reset, ball to the FOULED side
+  foulReset(teamOf(fouled));           // b110: ball to the fouled TEAM's side (1v1: teamOf===who, identical)
 }
 // reuse the EXISTING goal-kickoff reset; possession to the fouled side (like the conceder after a goal). Cards persist across it.
 function foulReset(fouledSide){
-  const pc=players.p.cards||0, tc=players.t.cards||0, po=!!players.p.out, to=!!players.t.out;
+  const snap=allPlayers().map(p=>({id:p.id,cards:p.cards||0,out:!!p.out}));   // b110: preserve ALL players' bookings (1v1: p+t, identical)
   reset(fouledSide);                   // SAME flow as a post-goal kickoff (reset() rebuilds players + nudges the ball to the conceder/fouled side)
-  players.p.cards=pc; players.t.cards=tc; players.p.out=po; players.t.out=to;   // re-stamp the persistent card state the rebuild cleared
+  snap.forEach(s=>{ if(players[s.id]){ players[s.id].cards=s.cards; players[s.id].out=s.out; } });   // re-stamp the persistent card state the rebuild cleared
   goalLock=Math.max(goalLock,40);      // brief settle beat (clock pauses, like after a goal)
 }
 
@@ -2389,6 +2392,7 @@ function updatePossession(){
   if(ball.rebCD>0) ball.rebCD--;                    // tick the rebound-bonus cooldown
   if(ball.netSide){ ball.owner=null; return; }      // caught in net — leave it
   if(ball.kickLock>0){ball.kickLock--; ball.owner=null; return;}
+  if(mode==='2v2'){ updatePossession2v2(); return; }   // b110: 4-player possession contest (nearest player grabs; nearest opponent contests)
   const dp=Math.hypot(ball.x-players.p.x, ball.y-players.p.y);
   const dt=oppActive?Math.hypot(ball.x-players.t.x, ball.y-players.t.y):1e9;
   const capP=grabCap(players.p), capT=oppActive?grabCap(players.t):0, cur=ball.owner;
@@ -2415,17 +2419,43 @@ function updatePossession(){
     else if(oppActive && dt<capT){ ball.owner='t'; rebChk('t'); }
   }
 }
+// b110: 2v2 possession — carrier keeps it until they overextend or the nearest OPPONENT wins a steal contest;
+// a loose ball goes to the nearest player inside their grab box. owner is a UNIQUE id (p/p2/t/t2).
+function updatePossession2v2(){
+  const cur=ball.owner;
+  if(cur){
+    const carrier=players[cur]; if(!carrier || carrier.out){ ball.owner=null; return; }
+    const cd=Math.hypot(ball.x-carrier.x, ball.y-carrier.y);
+    if(cd>grabCap(carrier)+8){ ball.owner=null; return; }        // overextended -> loose
+    if(ball.stealCD>0) ball.stealCD--;
+    let best=null,bd=1e9;                                          // nearest OPPONENT
+    for(const pl of allPlayers()){ if(pl.out || pl.team===carrier.team) continue; const d=Math.hypot(ball.x-pl.x,ball.y-pl.y); if(d<bd){bd=d;best=pl;} }
+    if(best && bd<grabCap(best) && (ball.stealCD||0)<=0){
+      const gap=(best.defense||5)-(carrier.dribble||5);
+      const pr=clamp(STEAL_BASE + gap*STEAL_WEIGHT, STEAL_MIN, STEAL_MAX);
+      if(Math.random()<pr){ if(best.id!==ball.shooter) ball.oppTouch=true; sfxGrunt(carrier.char); ball.owner=best.id; ball.stealCD=STEAL_COOLDOWN; }
+      else ball.stealCD=STEAL_TRY_GAP;
+    }
+  }else{
+    let best=null,bd=1e9;                                          // loose -> nearest player
+    for(const pl of allPlayers()){ if(pl.out) continue; const d=Math.hypot(ball.x-pl.x,ball.y-pl.y); if(d<bd){bd=d;best=pl;} }
+    if(best && bd<grabCap(best)){ ball.owner=best.id; rebChk(best.team); }
+  }
+}
 // players are solid — separate them so they can't overlap
 function separatePlayers(){
   if(!oppActive)return;
-  const a=players.p, b=players.t, min=PLAYER_R*2;
-  const dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
-  if(d<min){
-    d=d||0.01; const nx=dx/d, ny=dy/d, ov=(min-d)/2;
-    a.x-=nx*ov; a.y-=ny*ov; b.x+=nx*ov; b.y+=ny*ov;
-    confineRound(a,PLAYER_R); confineRound(b,PLAYER_R);
-    const rel=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;
-    if(rel<0){ a.vx+=nx*rel*0.5; a.vy+=ny*rel*0.5; b.vx-=nx*rel*0.5; b.vy-=ny*rel*0.5; }
+  const list=allPlayers(), min=PLAYER_R*2;   // b110: all-pairs (1v1: single [p,t] pair -> identical)
+  for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){
+    const a=list[i], b=list[j];
+    const dx=b.x-a.x, dy=b.y-a.y; let d=Math.hypot(dx,dy);
+    if(d<min){
+      d=d||0.01; const nx=dx/d, ny=dy/d, ov=(min-d)/2;
+      a.x-=nx*ov; a.y-=ny*ov; b.x+=nx*ov; b.y+=ny*ov;
+      confineRound(a,PLAYER_R); confineRound(b,PLAYER_R);   // confineRound applies the defender half-lock
+      const rel=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;
+      if(rel<0){ a.vx+=nx*rel*0.5; a.vy+=ny*rel*0.5; b.vx-=nx*rel*0.5; b.vy-=ny*rel*0.5; }
+    }
   }
 }
 function glueBall(){
@@ -2826,8 +2856,9 @@ function draw(){
     ctx.beginPath();ctx.ellipse(ball.x,ball.y+10,BALL_R,BALL_R*0.5,0,0,7);ctx.fill();
     drawBall(ball.x,ball.y);
     // players
-    if(oppActive) drawPlayer(players.t,imgFor(players.t.char),'#ff8787');
-    drawPlayer(players.p,imgFor(players.p.char),'#69db7c');
+    if(mode==='2v2'){ allPlayers().forEach(pl=> drawPlayer(pl, imgFor(pl.char), pl.team==='p'?'#69db7c':'#ff8787')); }   // b110: draw all 4 by team colour
+    else { if(oppActive) drawPlayer(players.t,imgFor(players.t.char),'#ff8787');
+           drawPlayer(players.p,imgFor(players.p.char),'#69db7c'); }
     // aim arrows for human-controlled players — NOT in keep-away (it's a possession mode, no shooting; arrow is just noise)
     if(gameMode!=='keepaway'){
       drawAim(players.p,'#9bf6a8', ball.owner==='p');
@@ -2996,17 +3027,21 @@ function loop(ts){
       if(slowmoT>0) slowmoT-=dt;           // count the slow-mo window down in real time
       if(!halftime){                       // freeze the whole pitch during the half-time break
         controlPlayer(players.p);
-        if(netRole==='host') controlNet(players.t);
+        if(mode==='2v2'){ aiControl(players.p2); aiControl(players.t); aiControl(players.t2); }   // b110: human=p; teammate p2 + opponents t,t2 are CPU
+        else if(netRole==='host') controlNet(players.t);
         else if(oppActive){ if(mode==='2p')controlPlayer(players.t); else aiControl(players.t); }
-        footsteps(players.p); if(oppActive) footsteps(players.t);
+        if(mode==='2v2') allPlayers().forEach(footsteps); else { footsteps(players.p); if(oppActive) footsteps(players.t); }
         processLunges();          // b85: detect lunge contact -> clean ball-win or foul/card/reset (authoritative; guest mirrors)
         separatePlayers();
         updatePossession();
-        if(goalLock<=0 && !golden){ if(ball.owner==='p') possP+=dt; else if(ball.owner==='t') possT+=dt; }
+        if(goalLock<=0 && !golden){ const ot=ownerTeam(); if(ot==='p') possP+=dt; else if(ot==='t') possT+=dt; }   // b110: possession by TEAM (owner is a unique id)
         if(ball.owner) glueBall();
-        else { if(ball.kickLock<=0 || ball.kicker!=='p') ballPlayer(players.p);
-               if(oppActive && (ball.kickLock<=0 || ball.kicker!=='t')) ballPlayer(players.t);
-               stepBall(); }
+        else {
+          if(mode==='2v2') allPlayers().forEach(pl=>{ if(ball.kickLock<=0 || ball.kicker!==pl.id) ballPlayer(pl); });
+          else { if(ball.kickLock<=0 || ball.kicker!=='p') ballPlayer(players.p);
+                 if(oppActive && (ball.kickLock<=0 || ball.kicker!=='t')) ballPlayer(players.t); }
+          stepBall();
+        }
       }
       updateHUD();
       // keep streaming even while frozen so the guest sees ht=1 (freeze) then ht=0 (resume)

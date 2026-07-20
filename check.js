@@ -3799,6 +3799,13 @@ function _beginGame(){
   $('pTeam').textContent = STATS[humanChar].abbr;
   $('tTeam').textContent = ranked? 'CPU' : STATS[oc].abbr;
   newGame(); lastTs=performance.now(); state='play'; audioInit(); stopMusic();
+  if(mode==='2v2' && players.p2 && players.t2){   // b110: the two HUD cards represent TEAMS in 2v2 — show both members' abbrs + role (⚔ att / 🛡 def)
+    const rl=r=>r==='def'?'🛡':'⚔';
+    $('pCard').querySelector('.pc-name').textContent = (account?account.username:STATS[humanChar].name);
+    $('tCard').querySelector('.pc-name').textContent = 'CPU';
+    $('pTeam').textContent = rl(players.p.role)+STATS[players.p.char].abbr+' '+rl(players.p2.role)+STATS[players.p2.char].abbr;
+    $('tTeam').textContent = rl(players.t.role)+STATS[players.t.char].abbr+' '+rl(players.t2.role)+STATS[players.t2.char].abbr;
+  }
   showMatchBanner();
 }
 function togglePause(){

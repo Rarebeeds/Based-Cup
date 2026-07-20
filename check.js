@@ -702,8 +702,9 @@ function tryKick(pl, chargeAmt){
   sfxKick(); sfxGrunt(pl.char);
 }
 
-// ---- AI for Trumpe (roams the whole pitch) ----
+// b110: 2v2 uses a TEAM/ROLE-aware AI (below) instead of the 1v1 single-opponent logic.
 function aiControl(pl){
+  if(mode==='2v2') return aiControl2v2(pl);
   // Difficulty tiers escalate on FIVE axes, not one: reaction time, shot aim+accuracy, corner targeting,
   // defence/interception, and turn-to-turn unpredictability. (AI decision-logic only — stats/grabCap untouched.)
   // lunge = per-frame willingness to lunge when the tackle reads CLEAN; lungeSloppy = chance it dives in ANYWAY
@@ -782,6 +783,68 @@ function aiControl(pl){
     const aimY = clamp(ball.y + (post-ball.y)*D.corner*0.7, GY0+20, GY1-20);
     pl.aim = Math.atan2(aimY-pl.y, FIELD.l-pl.x) + (Math.random()-.5)*D.aimErr;
     tryKick(pl,0.7);
+  }
+}
+// b110: TEAM/ROLE-aware 2v2 AI — works for any CPU on either team. Attackers press/advance/shoot at the
+// ENEMY goal; defenders (half-locked) sit in the intercept lane between the ball and their OWN goal. Reuses
+// the difficulty table + applyMoveAI + tryKick/tryLunge + the b89 clean-tackle lunge decision.
+function aiControl2v2(pl){
+  if(!pl || pl.out) return;
+  const D={easy:  {spd:.72, err:48, kick:.50, react:13, aimErr:.40, corner:.15, lead:.04, lunge:.012, lungeSloppy:.60},
+           normal:{spd:.90, err:26, kick:.78, react:5,  aimErr:.16, corner:.62, lead:.16, lunge:.040, lungeSloppy:.20},
+           hard:  {spd:1.0, err:10, kick:.95, react:1,  aimErr:.05, corner:.95, lead:.30, lunge:.075, lungeSloppy:.00}}[diff]
+        || {spd:.90,err:26,kick:.78,react:5,aimErr:.16,corner:.62,lead:.16,lunge:.040,lungeSloppy:.20};
+  const att = pl.team==='p';                                    // team p attacks the RIGHT goal, team t the LEFT
+  const goalAtkX = att ? FIELD.r : FIELD.l, goalDefX = att ? FIELD.l : FIELD.r;
+  const owner=ball.owner, ownT=ownerTeam(), iHave=(owner===pl.id), weHave=(ownT===pl.team);
+  let onBall=null, ed=1e9;                                       // nearest ENEMY to the ball (press/tackle target)
+  for(const q of allPlayers()){ if(q.out||q.team===pl.team) continue; const d=Math.hypot(ball.x-q.x,ball.y-q.y); if(d<ed){ed=d;onBall=q;} }
+  if(pl.aiTick==null){ pl.aiTick=0; pl.aiCorner=1; pl.aiLane=0; pl.aiTgt=null; pl.aiLastOwner='?'; }
+  if(pl.aiLastOwner!==owner || Math.random()<0.01){ pl.aiLastOwner=owner;
+    pl.aiCorner = (Math.random() < 0.5 + D.corner*0.5) ? 1 : -1;
+    pl.aiLane = (Math.random()-.5) * 70; }
+  pl.aiTick--;
+  if(pl.aiTick<=0 || !pl.aiTgt){
+    pl.aiTick=D.react; let tx,ty;
+    if(iHave){                                                  // carrying -> drive at the enemy goal
+      tx = goalAtkX; ty = clamp(ball.y + pl.aiLane*0.4, GY0+16, GY1-16);
+    }else if(weHave){                                           // teammate has it
+      if(pl.role==='def'){ tx = (goalDefX + W/2)/2; ty = clamp(H/2 + pl.aiLane, GY0+30, GY1-30); }   // hold behind halfway
+      else { tx = att ? Math.min(W*0.60, ball.x+170) : Math.max(W*0.40, ball.x-170); ty = clamp(ball.y + (H/2-ball.y)*0.3 + pl.aiLane, GY0+20, GY1-20); }   // push ahead of the ball
+    }else{                                                      // enemy has it / loose
+      if(pl.role==='def'){ tx = ball.x + (goalDefX-ball.x)*0.35; ty = ball.y + (H/2-ball.y)*0.35 + pl.aiLane*0.3; }   // intercept lane
+      else { tx = ball.x + ball.vx*D.lead*6 + pl.aiLane*0.3; ty = ball.y + ball.vy*D.lead*6 + pl.aiLane*0.3; }        // press the ball
+    }
+    tx+=(Math.random()-.5)*D.err; ty+=(Math.random()-.5)*D.err;
+    pl.aiTgt={x:tx,y:ty};
+  }
+  let ax=pl.aiTgt.x-pl.x, ay=pl.aiTgt.y-pl.y; const m=Math.hypot(ax,ay)||1; ax/=m; ay/=m;
+  if(m>2) pl.aim=Math.atan2(pl.aiTgt.y-pl.y, pl.aiTgt.x-pl.x);
+  const dd=Math.hypot(ball.x-pl.x, ball.y-pl.y);
+  applyMoveAI(pl, ax*D.spd, ay*D.spd, pl.stamina>0.25 && (dd>175 || iHave));
+  // clean-tackle lunge (only when the enemy has the ball / it's loose) — reuses the b89 decision
+  if(pl.lungeCD<=0 && pl.lunging<=0 && kickoffLock===0 && goalLock<=0 && !pl.out && !weHave && onBall){
+    const dBall=dd, dOpp=Math.hypot(pl.x-onBall.x, pl.y-onBall.y), div=(pl.dive!=null?pl.dive:10);
+    const reach=(LUNGE_DIST_BASE + div*LUNGE_DIST_PER_DIV)*LUNGE_DEF_BONUS;
+    const onYellow=(pl.cards||0)>=1, marginNeeded=LUNGE_AI_FOUL_MARGIN*(onYellow?LUNGE_AI_YELLOW_CAUTION:1);
+    const clean=(dOpp-dBall)>=marginNeeded, willing=D.lunge*clamp(div/LUNGE_AI_DIVE_REF,0.3,2.0);
+    if(dBall <= reach + LUNGE_AI_REACH_MARGIN){ let go=false;
+      if(clean) go=Math.random()<willing; else if(!onYellow) go=Math.random()<willing*D.lungeSloppy;
+      if(go){ pl.aim=Math.atan2(ball.y-pl.y, ball.x-pl.x); tryLunge(pl); } }
+  }
+  if(kickoffLock===0){
+    const distGoal = Math.abs(pl.x - goalAtkX);
+    if(iHave){
+      if(pl.role==='def'){                                    // DEFENDER can't advance past halfway -> CLEAR upfield, never hoard
+        if(Math.random()<D.kick*0.6){ pl.aim=Math.atan2((H/2 + pl.aiLane*2)-pl.y, goalAtkX-pl.x)+(Math.random()-.5)*D.aimErr; tryKick(pl,0.85); }
+      } else if(distGoal < W*0.44 && Math.random()<D.kick){    // ATTACKER in range -> shoot at a goal corner
+        const post=pl.aiCorner>0?GY1-16:GY0+16, aimY=clamp(ball.y+(post-ball.y)*D.corner, GY0+12, GY1-12);
+        pl.aim=Math.atan2(aimY-pl.y, goalAtkX-pl.x)+(Math.random()-.5)*D.aimErr; tryKick(pl,0.9);
+      }
+    } else if(dd<PLAYER_R+BALL_R+16 && Math.random()<D.kick*0.85){   // loose ball at my feet -> win + clear toward the enemy goal
+      const post=pl.aiCorner>0?GY1-16:GY0+16, aimY=clamp(ball.y+(post-ball.y)*D.corner*0.7, GY0+20, GY1-20);
+      pl.aim=Math.atan2(aimY-pl.y, goalAtkX-pl.x)+(Math.random()-.5)*D.aimErr; tryKick(pl,0.7);
+    }
   }
 }
 function applyMoveAI(pl,ax,ay,sprint){
@@ -1549,7 +1612,7 @@ function loop(ts){
       if(slowmoT>0) slowmoT-=dt;           // count the slow-mo window down in real time
       if(!halftime){                       // freeze the whole pitch during the half-time break
         controlPlayer(players.p);
-        if(mode==='2v2'){ aiControl(players.p2); aiControl(players.t); aiControl(players.t2); }   // b110: human=p; teammate p2 + opponents t,t2 are CPU
+        if(mode==='2v2'){ if(kickoffLock>0) kickoffLock--; aiControl(players.p2); aiControl(players.t); aiControl(players.t2); }   // b110: human=p; teammate p2 + opponents t,t2 are CPU (kickoffLock ticked once/frame here, not per-AI)
         else if(netRole==='host') controlNet(players.t);
         else if(oppActive){ if(mode==='2p')controlPlayer(players.t); else aiControl(players.t); }
         if(mode==='2v2') allPlayers().forEach(footsteps); else { footsteps(players.p); if(oppActive) footsteps(players.t); }

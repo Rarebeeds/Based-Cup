@@ -271,21 +271,41 @@ let gameMode='goals', possP=0, possT=0;   // keepaway mode: hold the ball longes
 let half=1, halftime=false;               // two 1-minute halves
 let timeLeft=MATCH_TIME, golden=false, lastTs=0, kickoffLock=0;
 
-function mkPlayer(x,y,who,char){ const d=statDerived(char);
-  return {x,y,vx:0,vy:0,who,char,face:who==='p'?1:-1,
-    kickCD:0,boost:0, aim: who==='p'?0:Math.PI, stamina:1, sprinting:false, charge:0, charging:false,
+// b110: identity split for 2v2 — `team` (p/t, drives scoring/goal-side/facing) + `id` (p/p2/t/t2, UNIQUE,
+// drives ball ownership) + `role` (att/def). 1v1 passes only (x,y,team,char) → id defaults to team, so
+// who===id===team and every 1v1 code path is byte-identical. `role` null in 1v1.
+function mkPlayer(x,y,team,char,id,role){ const d=statDerived(char);
+  id=id||team;
+  return {x,y,vx:0,vy:0,who:id,team:team,id:id,role:role||null,char,face:team==='p'?1:-1,
+    kickCD:0,boost:0, aim: team==='p'?0:Math.PI, stamina:1, sprinting:false, charge:0, charging:false,
     maxOn:d.maxOn, maxOff:d.maxOff, kickPow:d.kickPow, stamDrain:d.stamDrain, stamRegen:d.stamRegen,
     defense:d.defense, dribble:d.dribble, grab:d.grab, dive:d.dive,
     lvx:0, lvy:0, lunging:0, lungeCD:0, lungeFoulDone:false,  // b85: lunge dash state
     cards:0, out:false}; }                                    // b85: cards (0=clean,1=yellow,2=red) + removed-from-match flag
+// b110: LOCAL 2v2 — teammate + 2 opponents (picked ONCE per match in newGame so they don't reshuffle each
+// kickoff) + the human's chosen role (Phase B pre-match select; defaults to attacker). Phase A = engine only.
+let mate2Char=null, opp1Char=null, opp2Char=null, humanRole='att';
+function pick2v2Chars(){
+  const pool=ROSTER.filter(c=>c!==humanChar);
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+  mate2Char=pool[0]||'boomer'; opp1Char=pool[1]||'wojak'; opp2Char=pool[2]||'chad';
+}
 function reset(concededBy){
-  const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
-  const prev = players;   // b97: PRESERVE persistent per-player match state (yellow/red cards + sent-off flag) across
-  players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };   // the rebuild — a goal/half-time
-  if(prev){                                                                          // kickoff must NOT wipe a booking,
-    players.p.cards=prev.p.cards||0; players.p.out=!!prev.p.out;                      // else a 2nd yellow can never
-    players.t.cards=prev.t.cards||0; players.t.out=!!prev.t.out;                      // trigger the red (players exceed
-  }                                                                                  // 2 yellows). newGame() clears it for a fresh match.
+  const prev = players;   // b97: PRESERVE persistent per-player match state (yellow/red cards + sent-off flag) across the rebuild
+  if(mode==='2v2'){
+    const oc = opp1Char || (humanChar==='pepe'?'trumpe':'pepe');
+    const hRole = humanRole==='def'?'def':'att', mRole = hRole==='att'?'def':'att';   // teammate takes the OTHER role
+    players={ p:  mkPlayer(W*0.35, H*0.38, 'p', humanChar,          'p',  hRole),      // human (front/back set by role)
+              p2: mkPlayer(W*0.15, H*0.62, 'p', mate2Char||'boomer','p2', mRole),      // CPU teammate
+              t:  mkPlayer(W*0.65, H*0.62, 't', oc,                 't',  'att'),      // CPU opponents: one att, one def
+              t2: mkPlayer(W*0.85, H*0.38, 't', opp2Char||'wojak',  't2', 'def') };
+    if(prev){ ['p','p2','t','t2'].forEach(k=>{ if(prev[k]&&players[k]){ players[k].cards=prev[k].cards||0; players[k].out=!!prev[k].out; } }); }
+  } else {
+    const oc = oppChar || (humanChar==='pepe'?'trumpe':'pepe');
+    players={ p:mkPlayer(W*0.27,H/2,'p',humanChar), t:mkPlayer(W*0.73,H/2,'t',oc) };   // 1v1 — byte-identical to pre-b110
+    if(prev){ players.p.cards=prev.p.cards||0; players.p.out=!!prev.p.out;
+              players.t.cards=prev.t.cards||0; players.t.out=!!prev.t.out; }
+  }
   ball={x:W/2,y:H/2,vx:0,vy:0, owner:null, kickLock:18};
   if(concededBy==='t'){ ball.x=W*0.64; ball.vx=1.2; }
   else if(concededBy==='p'){ ball.x=W*0.36; ball.vx=-1.2; }
@@ -293,8 +313,9 @@ function reset(concededBy){
 }
 function newGame(){score={p:0,t:0}; possP=0; possT=0; half=1; halftime=false; timeLeft=matchLen(); golden=false;
   clearTimeout(htTimer); hideHalftime();
+  if(mode==='2v2') pick2v2Chars();   // b110: assign teammate + 2 opponents once for this match (before reset spawns them)
   setMeta(''); updateHUD(); reset(); goalLock=0;
-  players.p.cards=0; players.p.out=false; players.t.cards=0; players.t.out=false;   // b97: fresh match — clear the card/out state reset() now preserves
+  allPlayers().forEach(p=>{ p.cards=0; p.out=false; });   // b110: fresh card/out for ALL players (1v1: p+t, identical)
   goalSeq=0; goalSeen=0; goalFx=null; shakeAmp=0;
   foulSeq=0; foulSeen=0; foulCardType=0; foulCardSide=''; lungeReq=false;   // b85: fresh card state each match
   slowmoT=0; netSlowmo=false; motionScale=1; camZoom=1; camFocusX=W/2; camFocusY=H/2;
@@ -810,9 +831,12 @@ function tryLunge(pl){
   pl.lvx = Math.cos(pl.aim)*v0; pl.lvy = Math.sin(pl.aim)*v0;
   try{ sfxGrunt(pl.char); }catch(e){}
 }
-// GENERAL team model (1v1: each player IS their team). 2v2 later just expands teamPlayers/teamOf — foul code unchanged.
-function teamOf(pl){ return pl.who; }
-function teamPlayers(team){ return [players[team]]; }                    // 1v1: one player per team
+// GENERAL team model. b110: expanded for 2v2 via the id/team split — foul/forfeit code unchanged.
+function allPlayers(){ return [players.p, players.p2, players.t, players.t2].filter(Boolean); }   // 1v1: [p,t] (p2/t2 undefined)
+function teamMembers(team){ return allPlayers().filter(p=>p.team===team); }
+function ownerTeam(){ return ball.owner && players[ball.owner] ? players[ball.owner].team : null; }   // team that holds the ball (owner is a UNIQUE id now)
+function teamOf(pl){ return pl.team; }                                   // was pl.who; identical in 1v1 (team===who)
+function teamPlayers(team){ return teamMembers(team); }                  // 1v1: [players[team]]; 2v2: both members
 function teamAlive(team){ return teamPlayers(team).some(p=>p && !p.out); }
 function otherTeam(team){ return team==='p'?'t':'p'; }                   // 1v1 mapping; 2v2 returns the opposing team id
 // run every authoritative frame: did any lunging player make contact? (host/local only — a foul rebuilds players)

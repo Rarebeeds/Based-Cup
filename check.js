@@ -875,8 +875,8 @@ function issueFoul(lunger, fouled){
   if(goalLock>0 || lunger.out) return;
   lunger.cards=(lunger.cards||0)+1;
   const red = lunger.cards>=2;
-  recordCard(lunger.who, red);    // b88: per-character card tracking (every foul = 🟨; 2nd = 🟨+🟥) — before any early return
-  foulSeq++; foulCardType=red?2:1; foulCardSide=lunger.who;               // streamed so the guest flashes the same card
+  recordCard(teamOf(lunger), red);    // b88/b110: match-stat side is per-TEAM (matchStat keyed p/t); lunger.who is a UNIQUE id in 2v2
+  foulSeq++; foulCardType=red?2:1; foulCardSide=teamOf(lunger);           // team side for the card flash / HUD (identical in 1v1)
   showCard(red?'red':'yellow', STATS[lunger.char].name);
   showToast((red?'🟥 RED — ':'🟨 YELLOW — ')+STATS[lunger.char].name+(red?' sent off!':' (foul)'), red?'#ff6b6b':'#ffd43b');
   if(red){
@@ -1821,7 +1821,7 @@ function renderDaily(){
 function awardEndOfMatch(win){
   const myGoals = (netRole==='guest') ? (score.t||0) : (score.p||0);
   const gGain = myGoals*10, wGain = win?50:15, gain = gGain+wGain;
-  const beforeLvl = levelFromXp(account.xp||0).level;
+  const beforeLvl = levelFromXp((account&&account.xp)||0).level;   // b110: guard null account (guest / not-signed-in) — was an unguarded crash before the if(account) below
   if(account){ account.xp=(account.xp||0)+gain;
     const a=accounts(), me=a[account.username.toLowerCase()]; if(me){ me.xp=account.xp; saveAccts(a); } }
   pushProfile();   // b86: monotonic xp/wins/losses sync (GREATEST) — never lowers, retried (was fire-and-forget)
@@ -2666,6 +2666,11 @@ $('practiceBtn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedCh
 // the lobby MODE selector (goals/keep-away). Hidden on touch (two people can't share a phone).
 $('local2pBtn').onclick=()=>{ if(IS_TOUCH) return; audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
   ranked=false; oppActive=true; mode='2p'; practiceOpp='2p'; csContext='practice'; beginGame(); };
+// b110: 2V2 vs CPU (you + a CPU teammate vs 2 CPU). Available on desktop AND mobile (CPUs fill the other 3
+// slots). You're the ATTACKER (free to roam); your CPU teammate is the DEFENDER (half-locked). Full pre-match
+// position/captain select is Phase B. gameMode forced to goals for now (keep-away 2v2 later).
+$('team2Btn').onclick=()=>{ audioInit(); loadEquipped(); humanChar=equippedChar; selChar=equippedChar;
+  ranked=false; oppActive=true; mode='2v2'; humanRole='att'; gameMode='goals'; csContext='practice'; beginGame(); };
 // b90 UI REMODEL: invite slot (2v2 placeholder). Hover (desktop) reveals INVITE via CSS; tap (mobile) toggles it;
 // clicking INVITE shows a clean styled "coming with 2v2" message — no real party functionality yet.
 (function(){ const slot=$('inviteSlot'), btn=$('inviteBtn'); if(!slot) return;
